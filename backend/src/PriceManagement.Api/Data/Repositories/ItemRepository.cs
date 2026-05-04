@@ -15,6 +15,7 @@ public class ItemRepository : GenericRepository<Item>, IItemRepository
     public async Task<Item?> GetByCodeAsync(string itemCode, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(i => i.ItemCode == itemCode, cancellationToken);
     }
 
@@ -22,7 +23,7 @@ public class ItemRepository : GenericRepository<Item>, IItemRepository
     public async Task<Item?> GetWithSupplierPricesAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Include(i => i.ItemSupplierPrices.Where(isp => !isp.IsDeleted))
+            .Include(i => i.ItemSupplierPrices.Where(isp => isp.DeletedAt == null))
                 .ThenInclude(isp => isp.Supplier)
             .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
     }

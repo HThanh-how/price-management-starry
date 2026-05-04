@@ -33,9 +33,9 @@ public class AppDbContext : DbContext
         // Global query filters for soft delete
         // All queries automatically exclude soft-deleted records unless explicitly overridden
         // ========================================
-        modelBuilder.Entity<Item>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<Supplier>().HasQueryFilter(e => !e.IsDeleted);
-        modelBuilder.Entity<ItemSupplierPrice>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Item>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<Supplier>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<ItemSupplierPrice>().HasQueryFilter(e => e.DeletedAt == null);
     }
 
     /// <summary>
@@ -60,6 +60,10 @@ public class AppDbContext : DbContext
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = now;
                     entry.Entity.UpdatedBy ??= "system";
+                    
+                    // Increment RowVersion for optimistic concurrency control on MySQL
+                    entry.Entity.RowVersion++;
+                    
                     // Prevent modification of CreatedAt and CreatedBy on updates
                     entry.Property(e => e.CreatedAt).IsModified = false;
                     entry.Property(e => e.CreatedBy).IsModified = false;

@@ -15,6 +15,7 @@ public class SupplierRepository : GenericRepository<Supplier>, ISupplierReposito
     public async Task<Supplier?> GetByCodeAsync(string supplierCode, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.SupplierCode == supplierCode, cancellationToken);
     }
 }

@@ -48,7 +48,7 @@ public static class MappingExtensions
         UpdatedAt = entity.UpdatedAt,
         RowVersion = entity.RowVersion,
         SupplierPrices = entity.ItemSupplierPrices
-            .Where(isp => !isp.IsDeleted)
+            .Where(isp => isp.DeletedAt == null)
             .Select(isp => new ItemSupplierPriceDetailDto
             {
                 Id = isp.Id,

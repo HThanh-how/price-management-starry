@@ -52,19 +52,19 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(e => e.UpdatedBy).HasColumnName("updated_by").HasMaxLength(100);
 
         // Soft delete
-        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").HasDefaultValue(false);
+        builder.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
         // Optimistic concurrency token
         builder.Property(e => e.RowVersion)
             .HasColumnName("row_version")
-            .IsRowVersion();
+            .IsConcurrencyToken();
 
         // ========================================
         // Indexes for query performance
         // ========================================
 
-        // Unique index on ItemCode (only among non-deleted records)
-        builder.HasIndex(e => e.ItemCode)
+        // Unique index on ItemCode and DeletedAt (allows multiple soft-deleted, but only one active)
+        builder.HasIndex(e => new { e.ItemCode, e.DeletedAt })
             .IsUnique()
             .HasDatabaseName("IX_items_item_code");
 
@@ -73,7 +73,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             .HasDatabaseName("IX_items_status");
 
         // Index for soft delete filtering
-        builder.HasIndex(e => e.IsDeleted)
-            .HasDatabaseName("IX_items_is_deleted");
+        builder.HasIndex(e => e.DeletedAt)
+            .HasDatabaseName("IX_items_deleted_at");
     }
 }

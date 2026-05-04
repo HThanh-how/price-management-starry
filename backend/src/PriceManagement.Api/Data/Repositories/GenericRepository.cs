@@ -83,7 +83,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     /// <inheritdoc/>
     public virtual void SoftDelete(T entity)
     {
-        entity.IsDeleted = true;
+        entity.DeletedAt = DateTime.UtcNow;
         _dbSet.Update(entity);
     }
 

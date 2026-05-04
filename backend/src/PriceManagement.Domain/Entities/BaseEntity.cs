@@ -32,10 +32,10 @@ public abstract class BaseEntity
     public string? UpdatedBy { get; set; }
 
     /// <summary>
-    /// Soft delete flag. When true, the record is logically deleted but still exists in the database.
-    /// Global query filters automatically exclude soft-deleted records from normal queries.
+    /// Soft delete timestamp. When not null, the record is logically deleted.
+    /// Global query filters automatically exclude records where DeletedAt is not null.
     /// </summary>
-    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
 
     /// <summary>
     /// Concurrency token for optimistic concurrency control.

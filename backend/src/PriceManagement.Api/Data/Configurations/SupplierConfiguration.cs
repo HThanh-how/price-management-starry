@@ -54,21 +54,21 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(e => e.UpdatedAt).HasColumnName("updated_at");
         builder.Property(e => e.CreatedBy).HasColumnName("created_by").HasMaxLength(100);
         builder.Property(e => e.UpdatedBy).HasColumnName("updated_by").HasMaxLength(100);
-        builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").HasDefaultValue(false);
+        builder.Property(e => e.DeletedAt).HasColumnName("deleted_at");
 
         builder.Property(e => e.RowVersion)
             .HasColumnName("row_version")
-            .IsRowVersion();
+            .IsConcurrencyToken();
 
         // Indexes
-        builder.HasIndex(e => e.SupplierCode)
+        builder.HasIndex(e => new { e.SupplierCode, e.DeletedAt })
             .IsUnique()
             .HasDatabaseName("IX_suppliers_supplier_code");
 
         builder.HasIndex(e => e.Status)
             .HasDatabaseName("IX_suppliers_status");
 
-        builder.HasIndex(e => e.IsDeleted)
-            .HasDatabaseName("IX_suppliers_is_deleted");
+        builder.HasIndex(e => e.DeletedAt)
+            .HasDatabaseName("IX_suppliers_deleted_at");
     }
 }
