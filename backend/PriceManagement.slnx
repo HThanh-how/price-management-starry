@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PriceManagement.Api/PriceManagement.Api.csproj" />
+    <Project Path="src/PriceManagement.Application/PriceManagement.Application.csproj" />
+    <Project Path="src/PriceManagement.Domain/PriceManagement.Domain.csproj" />
+  </Folder>
+</Solution>
