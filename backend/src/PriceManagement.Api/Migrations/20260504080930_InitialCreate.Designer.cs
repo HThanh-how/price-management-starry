@@ -11,7 +11,7 @@ using PriceManagement.Api.Data;
 namespace PriceManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260504070058_InitialCreate")]
+    [Migration("20260504080930_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -38,16 +38,14 @@ namespace PriceManagement.Api.Migrations
                         .HasColumnType("varchar(100)")
                         .HasColumnName("created_by");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)")
                         .HasColumnName("description");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("ItemCode")
                         .IsRequired()
@@ -63,7 +61,6 @@ namespace PriceManagement.Api.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int unsigned")
                         .HasColumnName("row_version");
 
@@ -88,15 +85,15 @@ namespace PriceManagement.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDeleted")
-                        .HasDatabaseName("IX_items_is_deleted");
-
-                    b.HasIndex("ItemCode")
-                        .IsUnique()
-                        .HasDatabaseName("IX_items_item_code");
+                    b.HasIndex("DeletedAt")
+                        .HasDatabaseName("IX_items_deleted_at");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_items_status");
+
+                    b.HasIndex("ItemCode", "DeletedAt")
+                        .IsUnique()
+                        .HasDatabaseName("IX_items_item_code");
 
                     b.ToTable("items", (string)null);
                 });
@@ -121,15 +118,13 @@ namespace PriceManagement.Api.Migrations
                         .HasColumnType("int")
                         .HasColumnName("currency");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
                     b.Property<DateTime>("EffectiveDate")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("effective_date");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
 
                     b.Property<Guid>("ItemId")
                         .HasColumnType("char(36)")
@@ -146,7 +141,6 @@ namespace PriceManagement.Api.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int unsigned")
                         .HasColumnName("row_version");
 
@@ -165,8 +159,8 @@ namespace PriceManagement.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDeleted")
-                        .HasDatabaseName("IX_isp_is_deleted");
+                    b.HasIndex("DeletedAt")
+                        .HasDatabaseName("IX_isp_deleted_at");
 
                     b.HasIndex("ItemId")
                         .HasDatabaseName("IX_isp_item_id");
@@ -206,16 +200,14 @@ namespace PriceManagement.Api.Migrations
                         .HasColumnType("varchar(100)")
                         .HasColumnName("created_by");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("email");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
@@ -224,7 +216,6 @@ namespace PriceManagement.Api.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int unsigned")
                         .HasColumnName("row_version");
 
@@ -255,13 +246,13 @@ namespace PriceManagement.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDeleted")
-                        .HasDatabaseName("IX_suppliers_is_deleted");
+                    b.HasIndex("DeletedAt")
+                        .HasDatabaseName("IX_suppliers_deleted_at");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_suppliers_status");
 
-                    b.HasIndex("SupplierCode")
+                    b.HasIndex("SupplierCode", "DeletedAt")
                         .IsUnique()
                         .HasDatabaseName("IX_suppliers_supplier_code");
 

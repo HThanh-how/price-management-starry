@@ -28,8 +28,8 @@ namespace PriceManagement.Api.Migrations
                     updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     created_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                     updated_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
-                    is_deleted = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
-                    row_version = table.Column<uint>(type: "int unsigned", rowVersion: true, nullable: false)
+                    deleted_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    row_version = table.Column<uint>(type: "int unsigned", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -53,8 +53,8 @@ namespace PriceManagement.Api.Migrations
                     updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     created_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                     updated_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
-                    is_deleted = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
-                    row_version = table.Column<uint>(type: "int unsigned", rowVersion: true, nullable: false)
+                    deleted_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    row_version = table.Column<uint>(type: "int unsigned", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -77,8 +77,8 @@ namespace PriceManagement.Api.Migrations
                     updated_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     created_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
                     updated_by = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true),
-                    is_deleted = table.Column<bool>(type: "tinyint(1)", nullable: false, defaultValue: false),
-                    row_version = table.Column<uint>(type: "int unsigned", rowVersion: true, nullable: false)
+                    deleted_at = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    row_version = table.Column<uint>(type: "int unsigned", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -99,9 +99,9 @@ namespace PriceManagement.Api.Migrations
                 .Annotation("MySQL:Charset", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_isp_is_deleted",
+                name: "IX_isp_deleted_at",
                 table: "item_supplier_prices",
-                column: "is_deleted");
+                column: "deleted_at");
 
             migrationBuilder.CreateIndex(
                 name: "IX_isp_item_id",
@@ -119,14 +119,14 @@ namespace PriceManagement.Api.Migrations
                 column: "supplier_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_items_is_deleted",
+                name: "IX_items_deleted_at",
                 table: "items",
-                column: "is_deleted");
+                column: "deleted_at");
 
             migrationBuilder.CreateIndex(
                 name: "IX_items_item_code",
                 table: "items",
-                column: "item_code",
+                columns: new[] { "item_code", "deleted_at" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -135,9 +135,9 @@ namespace PriceManagement.Api.Migrations
                 column: "status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_suppliers_is_deleted",
+                name: "IX_suppliers_deleted_at",
                 table: "suppliers",
-                column: "is_deleted");
+                column: "deleted_at");
 
             migrationBuilder.CreateIndex(
                 name: "IX_suppliers_status",
@@ -147,7 +147,7 @@ namespace PriceManagement.Api.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_suppliers_supplier_code",
                 table: "suppliers",
-                column: "supplier_code",
+                columns: new[] { "supplier_code", "deleted_at" },
                 unique: true);
         }
 
