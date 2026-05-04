@@ -1,0 +1,82 @@
+# ============================================
+# Docker Compose for Price Management Tool
+# Services: API + MySQL + Redis
+# ============================================
+
+services:
+  # .NET 10 Web API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: price-management-api
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=price_management
+      - DB_USER=priceadmin
+      - DB_PASSWORD=${DB_PASSWORD:-P@ssw0rd123}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - price-network
+    restart: unless-stopped
+
+  # MySQL 8 Database
+  mysql:
+    image: mysql:8.0
+    container_name: price-management-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-P@ssw0rd123}
+      MYSQL_DATABASE: price_management
+      MYSQL_USER: priceadmin
+      MYSQL_PASSWORD: ${DB_PASSWORD:-P@ssw0rd123}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-P@ssw0rd123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - price-network
+    restart: unless-stopped
+
+  # Redis 7 Cache
+  redis:
+    image: redis:7-alpine
+    container_name: price-management-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - price-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  price-network:
+    driver: bridge
