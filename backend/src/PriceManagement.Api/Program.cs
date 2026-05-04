@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
 using PriceManagement.Api.Data;
@@ -51,9 +52,14 @@ try
 
     var connectionString = $"Server={dbHost};Port={dbPort};Database={dbName};User={dbUser};Password={dbPassword};";
 
-    builder.Services.AddDbContext<AppDbContext>(options =>
+    // Register the slow query interceptor
+    builder.Services.AddSingleton<PriceManagement.Api.Data.Interceptors.SlowQueryInterceptor>();
+
+    builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     {
         options.UseMySQL(connectionString);
+        options.AddInterceptors(sp.GetRequiredService<PriceManagement.Api.Data.Interceptors.SlowQueryInterceptor>());
+
         // Enable detailed SQL parameter logging in Development
         if (builder.Environment.IsDevelopment())
         {
@@ -158,12 +164,21 @@ try
     // 3. Request logging (logs method, path, status, elapsed time)
     app.UseMiddleware<RequestLoggingMiddleware>();
 
-    // 4. Swagger UI (available in all environments for this demo project)
+    // 4. OpenAPI + Scalar (modern API documentation UI)
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "Price Management API v1");
         options.RoutePrefix = "swagger";
+    });
+
+    // 4b. Scalar — premium API reference UI (accessible at /scalar/v1)
+    app.MapScalarApiReference(options =>
+    {
+        options
+            .WithTitle("Price Management API")
+            .WithTheme(ScalarTheme.BluePlanet)
+            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
 
     // 5. CORS
