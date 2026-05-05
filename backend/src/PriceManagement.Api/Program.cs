@@ -204,8 +204,6 @@ try
         try
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await dbContext.Database.MigrateAsync();
-            Log.Information("Database migration completed successfully.");
 
             // Seed default admin user if no users exist
             if (!await dbContext.Users.AnyAsync())
