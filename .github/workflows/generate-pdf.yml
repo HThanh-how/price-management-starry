@@ -23,7 +23,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y webp
           cd docs/assets
-          for f in *.webp; do dwebp "$f" -o "${f%.*}.png"; done
+          for f in *.webp; do 
+            echo "Processing $f..."
+            if webpmux -get frame 1 "$f" -o "temp_$f" 2>/dev/null; then
+              echo "Animated WebP detected. Extracting first frame."
+              dwebp "temp_$f" -o "${f%.*}.png"
+              rm "temp_$f"
+            else
+              echo "Static WebP detected. Direct conversion."
+              dwebp "$f" -o "${f%.*}.png"
+            fi
+          done
           ls -la *.png
 
       - name: Compile LaTeX to PDF
