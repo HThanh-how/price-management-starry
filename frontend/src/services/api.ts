@@ -4,6 +4,7 @@ import type {
   ItemDto, ItemDetailDto, CreateItemRequest, UpdateItemRequest,
   SupplierDto, CreateSupplierRequest, UpdateSupplierRequest,
   PriceDto, CreatePriceRequest, UpdatePriceRequest,
+  AuditLogDto,
 } from '@/types';
 
 // ========================================
@@ -111,6 +112,24 @@ export const priceService = {
 
   delete: async (id: string) => {
     const { data } = await apiClient.delete<ApiResponse<object>>(`/prices/${id}`);
+    return data;
+  },
+};
+
+// ========================================
+// Audit Log API service
+// ========================================
+
+export const auditLogService = {
+  /** Retrieve audit history for a specific entity */
+  getByEntity: async (entityType: string, entityId: string, page = 1, pageSize = 20) => {
+    const params = new URLSearchParams({
+      pageNumber: String(page),
+      pageSize: String(pageSize),
+    });
+    const { data } = await apiClient.get<ApiResponse<PagedResult<AuditLogDto>>>(
+      `/audit-logs/${entityType}/${entityId}?${params}`
+    );
     return data;
   },
 };

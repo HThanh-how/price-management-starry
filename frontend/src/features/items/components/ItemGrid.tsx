@@ -16,9 +16,24 @@ export function ItemGrid({ items, isLoading, onCellValueChanged, onViewDetail, o
 
   const columnDefs: ColDef<ItemDto>[] = [
     { field: 'itemCode', headerName: 'Item Code', width: 140, filter: 'agTextColumnFilter', sortable: true, pinned: 'left' },
-    { field: 'itemName', headerName: 'Item Name', flex: 1, minWidth: 200, editable: true, filter: 'agTextColumnFilter', sortable: true },
+    {
+      field: 'itemName', headerName: 'Item Name', flex: 1, minWidth: 200, filter: 'agTextColumnFilter', sortable: true,
+      cellRenderer: (params: { value: string; data: ItemDto }) => (
+        <button
+          className="text-primary hover:underline text-left w-full font-medium"
+          onClick={() => onViewDetail(params.data.id)}
+        >
+          {params.value}
+        </button>
+      ),
+    },
+    { field: 'category', headerName: 'Category', width: 140, filter: 'agTextColumnFilter', sortable: true },
     { field: 'description', headerName: 'Description', flex: 1, minWidth: 200, editable: true, filter: 'agTextColumnFilter' },
     { field: 'unit', headerName: 'Unit', width: 100, editable: true, filter: 'agTextColumnFilter', sortable: true },
+    {
+      field: 'basePrice', headerName: 'Base Price', width: 130, sortable: true,
+      valueFormatter: (params) => params.value != null ? `$${Number(params.value).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—',
+    },
     {
       field: 'status', headerName: 'Status', width: 120, editable: true,
       cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Active', 'Inactive'] },

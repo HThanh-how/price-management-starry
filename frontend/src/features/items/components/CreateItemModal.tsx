@@ -29,6 +29,17 @@ export function CreateItemModal({ isOpen, onClose, onSubmit, form, isPending }: 
         <Form.Item name="description" label="Description">
           <Input.TextArea rows={3} placeholder="Optional description" />
         </Form.Item>
+        <Form.Item name="category" label="Category">
+          <Select placeholder="Select category" allowClear>
+            <Select.Option value="Raw Materials">Raw Materials</Select.Option>
+            <Select.Option value="Components">Components</Select.Option>
+            <Select.Option value="Metals">Metals</Select.Option>
+            <Select.Option value="Electronics">Electronics</Select.Option>
+            <Select.Option value="Packaging">Packaging</Select.Option>
+            <Select.Option value="Chemicals">Chemicals</Select.Option>
+            <Select.Option value="Other">Other</Select.Option>
+          </Select>
+        </Form.Item>
         <Form.Item name="unit" label="Unit" rules={[{ required: true, message: 'Unit is required' }]}>
           <Select placeholder="Select unit">
             <Select.Option value="PCS">PCS (Pieces)</Select.Option>

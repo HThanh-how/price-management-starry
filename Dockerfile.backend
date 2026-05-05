@@ -1,0 +1,30 @@
+# =============================================
+# Backend Dockerfile — .NET 10 Web API
+# Multi-stage build: restore → build → publish → runtime
+# =============================================
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy solution and project files first (layer caching for NuGet restore)
+COPY backend/*.slnx ./
+COPY backend/src/PriceManagement.Domain/*.csproj src/PriceManagement.Domain/
+COPY backend/src/PriceManagement.Application/*.csproj src/PriceManagement.Application/
+COPY backend/src/PriceManagement.Api/*.csproj src/PriceManagement.Api/
+COPY backend/tests/PriceManagement.UnitTests/*.csproj tests/PriceManagement.UnitTests/
+RUN dotnet restore
+
+# Copy all source code and publish
+COPY backend/ .
+RUN dotnet publish src/PriceManagement.Api/PriceManagement.Api.csproj -c Release -o /app/publish --no-restore
+
+# Runtime image (minimal)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Expose API port
+EXPOSE 5000
+ENV ASPNETCORE_URLS=http://+:5000
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "PriceManagement.Api.dll"]

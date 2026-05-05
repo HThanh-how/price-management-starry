@@ -44,6 +44,9 @@ export interface ItemDto {
   itemName: string;
   description: string | null;
   unit: string;
+  category: string | null;
+  basePrice: number | null;
+  metadata: Record<string, string> | null;
   status: string;
   createdAt: string;
   updatedAt: string | null;
@@ -70,12 +73,18 @@ export interface CreateItemRequest {
   itemName: string;
   description?: string;
   unit: string;
+  category?: string;
+  basePrice?: number;
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateItemRequest {
   itemName: string;
   description?: string;
   unit: string;
+  category?: string;
+  basePrice?: number;
+  metadata?: Record<string, string>;
   status: string;
   rowVersion: number;
 }
@@ -153,4 +162,23 @@ export interface UpdatePriceRequest {
   effectiveDate: string;
   remark?: string;
   rowVersion: number;
+}
+
+// ========================================
+// Audit Log types
+// ========================================
+
+export interface AuditLogDto {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string;
+  changedAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  traceId: string | null;
 }

@@ -1,0 +1,32 @@
+# =============================================
+# Frontend Dockerfile — Next.js with standalone output
+# Multi-stage build: deps → build → runtime
+# =============================================
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci --legacy-peer-deps
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ .
+
+# Set API URL for build-time (Next.js bakes env vars at build)
+ENV NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+
+RUN npm run build
+
+# Runtime — standalone Next.js server
+FROM node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy standalone output
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+CMD ["node", "server.js"]

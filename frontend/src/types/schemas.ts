@@ -30,9 +30,55 @@ export const createItemSchema = z.object({
     .string()
     .min(1, 'Unit is required')
     .max(20, 'Unit must be 20 characters or fewer'),
+  category: z
+    .string()
+    .max(100, 'Category must be 100 characters or fewer')
+    .optional()
+    .or(z.literal('')),
+  basePrice: z
+    .number()
+    .min(0, 'Base price must be zero or positive')
+    .optional(),
+  metadata: z
+    .record(z.string(), z.string().max(500, 'Metadata value must be 500 characters or fewer'))
+    .optional(),
 });
 
 export type CreateItemFormData = z.infer<typeof createItemSchema>;
+
+/** Schema for updating an existing Item */
+export const updateItemSchema = z.object({
+  itemName: z
+    .string()
+    .min(1, 'Item name is required')
+    .max(200, 'Item name must be 200 characters or fewer'),
+  description: z
+    .string()
+    .max(1000, 'Description must be 1000 characters or fewer')
+    .optional()
+    .or(z.literal('')),
+  unit: z
+    .string()
+    .min(1, 'Unit is required')
+    .max(20, 'Unit must be 20 characters or fewer'),
+  category: z
+    .string()
+    .max(100, 'Category must be 100 characters or fewer')
+    .optional()
+    .or(z.literal('')),
+  basePrice: z
+    .number()
+    .min(0, 'Base price must be zero or positive')
+    .optional(),
+  metadata: z
+    .record(z.string(), z.string().max(500, 'Metadata value must be 500 characters or fewer'))
+    .optional(),
+  status: z
+    .string()
+    .min(1, 'Status is required'),
+});
+
+export type UpdateItemFormData = z.infer<typeof updateItemSchema>;
 
 // ========================================
 // Supplier Schemas
