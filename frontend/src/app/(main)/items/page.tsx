@@ -1,269 +1,286 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Space, Input, message, Modal, Form, Select, Drawer, Descriptions, Table, Tag, Spin } from 'antd';
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import React, { useState, useCallback, useRef } from 'react';
+import { message, Modal, Form, Select, Input } from 'antd';
 import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef, type CellValueChangedEvent } from 'ag-grid-community';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { itemService } from '@/services/api';
 import type { ItemDto, ItemDetailDto, CreateItemRequest } from '@/types';
 
-// Register AG Grid community modules
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-const { Search } = Input;
-
 /**
- * Master Item List page with AG Grid table, inline editing, and detail panel.
- * Supports: Create, Edit (inline), Sort, Filter, Detail view with supplier prices.
+ * Master Item List — Figma pixel-perfect with AG Grid + Detail Panel.
+ * Data management powered by TanStack React Query.
  */
 export default function ItemsPage() {
-  const [items, setItems] = useState<ItemDto[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [selectedItemDetail, setSelectedItemDetail] = useState<ItemDetailDto | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [form] = Form.useForm();
   const gridRef = useRef<AgGridReact>(null);
 
-  // Fetch items from API
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
+  // ========== React Query: Items List ==========
+  const { data: itemsData, isLoading } = useQuery({
+    queryKey: ['items', search],
+    queryFn: async () => {
       const response = await itemService.getAll(1, 100, search || undefined);
-      if (response.success) {
-        setItems(response.data.items);
-      }
-    } catch (error: unknown) {
-      const err = error as Error;
-      message.error(err.message || 'Failed to fetch items');
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
+      if (response.success) return response.data.items;
+      throw new Error(response.message);
+    },
+  });
+  const items = itemsData ?? [];
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  // ========== React Query: Item Detail ==========
+  const { data: selectedItemDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ['itemDetail', selectedItemId],
+    queryFn: async () => {
+      if (!selectedItemId) return null;
+      const response = await itemService.getDetail(selectedItemId);
+      if (response.success) return response.data;
+      throw new Error(response.message);
+    },
+    enabled: !!selectedItemId,
+  });
 
-  // Handle inline editing - save changes immediately to backend
-  const onCellValueChanged = useCallback(async (event: CellValueChangedEvent<ItemDto>) => {
+  // ========== Mutations ==========
+  const createMutation = useMutation({
+    mutationFn: (request: CreateItemRequest) => itemService.create(request),
+    onSuccess: () => {
+      message.success('Item created successfully');
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      setIsCreateModalOpen(false);
+      form.resetFields();
+    },
+    onError: (error: Error) => message.error(error.message || 'Failed to create item'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof itemService.update>[1] }) =>
+      itemService.update(id, data),
+    onSuccess: () => {
+      message.success('Item updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['itemDetail'] });
+    },
+    onError: (error: Error) => {
+      message.error(error.message || 'Failed to update item');
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => itemService.delete(id),
+    onSuccess: () => {
+      message.success('Item deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      setSelectedItemId(null);
+    },
+    onError: (error: Error) => message.error(error.message || 'Failed to delete item'),
+  });
+
+  // ========== Handlers ==========
+  const onCellValueChanged = useCallback((event: CellValueChangedEvent<ItemDto>) => {
     const { data } = event;
     if (!data) return;
+    updateMutation.mutate({
+      id: data.id,
+      data: { itemName: data.itemName, description: data.description || undefined, unit: data.unit, status: data.status, rowVersion: data.rowVersion },
+    });
+  }, [updateMutation]);
 
-    try {
-      await itemService.update(data.id, {
-        itemName: data.itemName,
-        description: data.description || undefined,
-        unit: data.unit,
-        status: data.status,
-        rowVersion: data.rowVersion,
-      });
-      message.success('Item updated successfully');
-      fetchItems(); // Refresh to get new rowVersion
-    } catch (error: unknown) {
-      const err = error as Error;
-      message.error(err.message || 'Failed to update item');
-      fetchItems(); // Revert on failure
-    }
-  }, [fetchItems]);
-
-  // View item detail with supplier prices
-  const viewDetail = useCallback(async (itemId: string) => {
-    setIsDetailOpen(true);
-    setDetailLoading(true);
-    try {
-      const response = await itemService.getDetail(itemId);
-      if (response.success) {
-        setSelectedItemDetail(response.data);
-      }
-    } catch (error: unknown) {
-      const err = error as Error;
-      message.error(err.message || 'Failed to fetch item detail');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  // Delete item
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     Modal.confirm({
       title: 'Confirm Delete',
       content: 'Are you sure you want to delete this item?',
-      onOk: async () => {
-        try {
-          await itemService.delete(id);
-          message.success('Item deleted successfully');
-          fetchItems();
-        } catch (error: unknown) {
-          const err = error as Error;
-          message.error(err.message || 'Failed to delete item');
-        }
-      },
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      onOk: () => deleteMutation.mutate(id),
     });
-  }, [fetchItems]);
+  }, [deleteMutation]);
 
-  // Create new item
   const handleCreate = async () => {
     try {
       const values = await form.validateFields();
-      const request: CreateItemRequest = {
+      createMutation.mutate({
         itemCode: values.itemCode,
         itemName: values.itemName,
         description: values.description,
         unit: values.unit,
-      };
-      await itemService.create(request);
-      message.success('Item created successfully');
-      setIsCreateModalOpen(false);
-      form.resetFields();
-      fetchItems();
+      });
     } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'errorFields' in error) return; // Form validation error
-      const err = error as Error;
-      message.error(err.message || 'Failed to create item');
+      if (error && typeof error === 'object' && 'errorFields' in error) return;
     }
   };
 
-  // AG Grid column definitions with inline editing
+  // ========== AG Grid Columns ==========
   const columnDefs: ColDef<ItemDto>[] = [
+    { field: 'itemCode', headerName: 'Item Code', width: 140, filter: 'agTextColumnFilter', sortable: true, pinned: 'left' },
+    { field: 'itemName', headerName: 'Item Name', flex: 1, minWidth: 200, editable: true, filter: 'agTextColumnFilter', sortable: true },
+    { field: 'description', headerName: 'Description', flex: 1, minWidth: 200, editable: true, filter: 'agTextColumnFilter' },
+    { field: 'unit', headerName: 'Unit', width: 100, editable: true, filter: 'agTextColumnFilter', sortable: true },
     {
-      field: 'itemCode',
-      headerName: 'Item Code',
-      width: 130,
-      filter: 'agTextColumnFilter',
-      sortable: true,
-      pinned: 'left',
-    },
-    {
-      field: 'itemName',
-      headerName: 'Item Name',
-      flex: 1,
-      minWidth: 200,
-      editable: true,
-      filter: 'agTextColumnFilter',
-      sortable: true,
-    },
-    {
-      field: 'description',
-      headerName: 'Description',
-      flex: 1,
-      minWidth: 200,
-      editable: true,
-      filter: 'agTextColumnFilter',
-    },
-    {
-      field: 'unit',
-      headerName: 'Unit',
-      width: 100,
-      editable: true,
-      filter: 'agTextColumnFilter',
-      sortable: true,
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      editable: true,
-      cellEditor: 'agSelectCellEditor',
-      cellEditorParams: { values: ['Active', 'Inactive'] },
-      filter: 'agTextColumnFilter',
-      sortable: true,
+      field: 'status', headerName: 'Status', width: 120, editable: true,
+      cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Active', 'Inactive'] },
+      filter: 'agTextColumnFilter', sortable: true,
       cellRenderer: (params: { value: string }) => {
-        const color = params.value === 'Active' ? 'green' : 'red';
-        return <Tag color={color}>{params.value}</Tag>;
+        const active = params.value === 'Active';
+        return (
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide border ${
+            active
+              ? 'bg-secondary-fixed text-on-secondary-fixed border-secondary-fixed-dim'
+              : 'bg-surface-container-high text-on-surface border-outline-variant'
+          }`}>{params.value}</span>
+        );
       },
     },
     {
-      headerName: 'Actions',
-      width: 130,
-      pinned: 'right',
-      sortable: false,
-      filter: false,
+      headerName: 'Actions', width: 100, pinned: 'right', sortable: false, filter: false,
       cellRenderer: (params: { data: ItemDto }) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => viewDetail(params.data.id)}
-            title="View Detail"
-          />
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(params.data.id)}
-            title="Delete"
-          />
-        </Space>
+        <div className="flex items-center gap-1 h-full">
+          <button className="p-1 text-primary hover:bg-primary-fixed rounded" onClick={() => setSelectedItemId(params.data.id)} title="View Detail">
+            <span className="material-symbols-outlined text-[16px]">visibility</span>
+          </button>
+          <button className="p-1 text-error hover:bg-error-container rounded" onClick={() => handleDelete(params.data.id)} title="Delete">
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+          </button>
+        </div>
       ),
     },
   ];
 
-  // Supplier prices table columns for the detail drawer
-  const supplierPriceColumns = [
-    { title: 'Supplier Code', dataIndex: 'supplierCode', key: 'supplierCode', width: 130 },
-    { title: 'Supplier Name', dataIndex: 'supplierName', key: 'supplierName' },
-    {
-      title: 'Price',
-      dataIndex: 'price',
-      key: 'price',
-      render: (val: number) => val?.toLocaleString('en-US', { minimumFractionDigits: 2 }),
-      align: 'right' as const,
-    },
-    { title: 'Currency', dataIndex: 'currency', key: 'currency', width: 100 },
-    {
-      title: 'Effective Date',
-      dataIndex: 'effectiveDate',
-      key: 'effectiveDate',
-      render: (val: string) => val ? new Date(val).toLocaleDateString() : '-',
-    },
-    { title: 'Remark', dataIndex: 'remark', key: 'remark' },
-  ];
-
   return (
-    <div>
-      {/* Toolbar */}
-      <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }} size="middle">
-        <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>
-            Add Item
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchItems}>Refresh</Button>
-        </Space>
-        <Search
-          placeholder="Search items..."
-          allowClear
-          style={{ width: 300 }}
-          onSearch={(val) => setSearch(val)}
-          onChange={(e) => !e.target.value && setSearch('')}
-        />
-      </Space>
+    <>
+      {/* Page Header — Figma: bg-surface-container-lowest p-md rounded-lg border */}
+      <div className="flex justify-between items-end bg-surface-container-lowest p-md rounded-lg border border-surface-container-high">
+        <div>
+          <h2 className="font-h3 text-h3 text-on-surface mb-xs">Master Item List</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant">Manage inventory items, specifications, and linked supplier pricing.</p>
+        </div>
+        <div className="flex gap-sm">
+          <button
+            className="px-4 py-2 border border-outline-variant rounded text-on-surface hover:bg-surface-container-low transition-colors font-label-md text-label-md flex items-center gap-2"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['items'] })}
+          >
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            Refresh
+          </button>
+          <button
+            className="px-4 py-2 bg-primary text-on-primary rounded hover:bg-on-primary-fixed-variant transition-colors font-label-md text-label-md flex items-center gap-2 shadow-sm"
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Create New Item
+          </button>
+        </div>
+      </div>
 
-      {/* AG Grid Table */}
-      <div style={{ height: 'calc(100vh - 280px)', width: '100%' }}>
-        <AgGridReact
-          ref={gridRef}
-          rowData={items}
-          columnDefs={columnDefs}
-          loading={loading}
-          defaultColDef={{
-            resizable: true,
-            floatingFilter: true,
-          }}
-          getRowId={(params) => params.data.id}
-          onCellValueChanged={onCellValueChanged}
-          animateRows
-          pagination
-          paginationPageSize={20}
-          paginationPageSizeSelector={[10, 20, 50, 100]}
-          rowSelection="single"
-          theme="legacy"
-        />
+      {/* Grid + Detail Panel — Figma 2-column */}
+      <div className="flex-1 flex gap-gutter overflow-hidden h-[calc(100vh-180px)]">
+        {/* Main AG Grid */}
+        <div className="flex-1 bg-surface-container-lowest border border-surface-container-high rounded-lg flex flex-col overflow-hidden">
+          <AgGridReact
+            ref={gridRef}
+            rowData={items}
+            columnDefs={columnDefs}
+            loading={isLoading}
+            defaultColDef={{ resizable: true, floatingFilter: true }}
+            getRowId={(params) => params.data.id}
+            onCellValueChanged={onCellValueChanged}
+            animateRows
+            pagination
+            paginationPageSize={20}
+            paginationPageSizeSelector={[10, 20, 50, 100]}
+            rowSelection="single"
+            className="ag-theme-alpine"
+            theme="legacy"
+          />
+        </div>
+
+        {/* Detail Panel — Figma: w-[400px] shadow */}
+        {selectedItemId && (
+          <div className="w-[400px] bg-surface-container-lowest border border-surface-container-high rounded-lg flex flex-col overflow-hidden shadow-[0_6px_16px_0_rgba(0,0,0,0.08)]">
+            {/* Panel Header */}
+            <div className="p-md border-b border-surface-container-high bg-surface-bright flex justify-between items-start">
+              <div>
+                {selectedItemDetail && (
+                  <>
+                    <div className="font-mono-data text-primary text-[11px] mb-1">{selectedItemDetail.itemCode}</div>
+                    <h3 className="font-h5 text-h5 text-on-surface">{selectedItemDetail.itemName}</h3>
+                  </>
+                )}
+                {detailLoading && <div className="text-sm text-on-surface-variant">Loading...</div>}
+              </div>
+              <button className="text-on-surface-variant hover:text-on-surface" onClick={() => setSelectedItemId(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Panel Content */}
+            {selectedItemDetail && !detailLoading && (
+              <>
+                <div className="flex-1 overflow-y-auto p-md flex flex-col gap-md">
+                  {/* Specs */}
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <div className="text-on-surface-variant">Base Unit:</div>
+                    <div className="text-on-surface font-medium">{selectedItemDetail.unit}</div>
+                    <div className="text-on-surface-variant">Status:</div>
+                    <div className="text-on-surface font-medium">{selectedItemDetail.status}</div>
+                    <div className="text-on-surface-variant">Description:</div>
+                    <div className="text-on-surface font-medium">{selectedItemDetail.description || '-'}</div>
+                    <div className="text-on-surface-variant">Last Updated:</div>
+                    <div className="text-on-surface font-medium">
+                      {selectedItemDetail.updatedAt
+                        ? new Date(selectedItemDetail.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : new Date(selectedItemDetail.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </div>
+
+                  <hr className="border-surface-container-high" />
+
+                  {/* Supplier Pricing Sub-Table — Figma layout */}
+                  <div>
+                    <div className="flex justify-between items-center mb-sm">
+                      <h4 className="font-label-md text-label-md text-on-surface font-semibold">Linked Suppliers &amp; Prices</h4>
+                      <span className="text-on-surface-variant text-xs">{selectedItemDetail.supplierPrices.length} supplier(s)</span>
+                    </div>
+                    <div className="border border-surface-container-high rounded overflow-hidden">
+                      {/* Sub-table header */}
+                      <div className="grid grid-cols-12 p-2 bg-surface-container-low border-b border-surface-container-high text-[11px] font-medium text-on-surface-variant uppercase">
+                        <div className="col-span-5">Supplier</div>
+                        <div className="col-span-4 text-right">Current Price</div>
+                        <div className="col-span-3 text-center">Currency</div>
+                      </div>
+                      {selectedItemDetail.supplierPrices.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-on-surface-variant">No supplier prices linked.</div>
+                      ) : (
+                        selectedItemDetail.supplierPrices.map((sp) => (
+                          <div key={sp.id} className="grid grid-cols-12 p-2 border-b border-surface-container-high text-xs items-center hover:bg-surface-container-low last:border-b-0">
+                            <div className="col-span-5 truncate text-on-surface font-medium">{sp.supplierName}</div>
+                            <div className="col-span-4 text-right font-mono-data">${sp.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                            <div className="col-span-3 text-center text-on-surface-variant">{sp.currency}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel Footer */}
+                <div className="p-md border-t border-surface-container-high bg-surface-bright flex gap-sm justify-end">
+                  <button className="px-3 py-1.5 border border-outline-variant rounded text-on-surface text-sm hover:bg-surface-container-low" onClick={() => setSelectedItemId(null)}>
+                    Close
+                  </button>
+                  <button className="px-3 py-1.5 bg-primary text-on-primary rounded text-sm hover:bg-on-primary-fixed-variant">
+                    Edit Item
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Create Item Modal */}
@@ -273,6 +290,7 @@ export default function ItemsPage() {
         onOk={handleCreate}
         onCancel={() => { setIsCreateModalOpen(false); form.resetFields(); }}
         okText="Create"
+        confirmLoading={createMutation.isPending}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="itemCode" label="Item Code" rules={[{ required: true, message: 'Item code is required' }]}>
@@ -290,53 +308,15 @@ export default function ItemsPage() {
               <Select.Option value="KG">KG (Kilogram)</Select.Option>
               <Select.Option value="SET">SET</Select.Option>
               <Select.Option value="BOX">BOX</Select.Option>
+              <Select.Option value="TON">TON</Select.Option>
               <Select.Option value="M">M (Meter)</Select.Option>
               <Select.Option value="L">L (Liter)</Select.Option>
+              <Select.Option value="SPOOL">SPOOL</Select.Option>
+              <Select.Option value="SHEET">SHEET</Select.Option>
             </Select>
           </Form.Item>
         </Form>
       </Modal>
-
-      {/* Item Detail Drawer with Supplier Prices */}
-      <Drawer
-        title={selectedItemDetail ? `Item Detail: ${selectedItemDetail.itemCode}` : 'Item Detail'}
-        open={isDetailOpen}
-        onClose={() => { setIsDetailOpen(false); setSelectedItemDetail(null); }}
-        width={720}
-      >
-        {detailLoading ? (
-          <div style={{ textAlign: 'center', padding: 50 }}><Spin size="large" /></div>
-        ) : selectedItemDetail ? (
-          <>
-            <Descriptions bordered column={2} size="small" style={{ marginBottom: 24 }}>
-              <Descriptions.Item label="Item Code">{selectedItemDetail.itemCode}</Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={selectedItemDetail.status === 'Active' ? 'green' : 'red'}>
-                  {selectedItemDetail.status}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Item Name" span={2}>{selectedItemDetail.itemName}</Descriptions.Item>
-              <Descriptions.Item label="Description" span={2}>{selectedItemDetail.description || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Unit">{selectedItemDetail.unit}</Descriptions.Item>
-              <Descriptions.Item label="Created">
-                {new Date(selectedItemDetail.createdAt).toLocaleString()}
-              </Descriptions.Item>
-            </Descriptions>
-
-            <h3 style={{ marginBottom: 12 }}>
-              Supplier Prices ({selectedItemDetail.supplierPrices.length})
-            </h3>
-            <Table
-              dataSource={selectedItemDetail.supplierPrices}
-              columns={supplierPriceColumns}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              locale={{ emptyText: 'No supplier prices linked to this item.' }}
-            />
-          </>
-        ) : null}
-      </Drawer>
-    </div>
+    </>
   );
 }
