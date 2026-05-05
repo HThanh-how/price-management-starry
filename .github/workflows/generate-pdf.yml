@@ -1,0 +1,41 @@
+name: Generate Executive Summary PDF
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'docs/Executive_Summary.tex'
+      - '.github/workflows/generate-pdf.yml'
+  workflow_dispatch:
+
+jobs:
+  build_pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install WebP Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webp
+
+      - name: Convert WebP images to PNG for LaTeX compatibility
+        run: |
+          if [ -d "docs/assets" ]; then
+            for f in docs/assets/*.webp; do 
+              dwebp "$f" -o "${f%.*}.png" || echo "Failed to convert $f"
+            done
+          fi
+
+      - name: Compile LaTeX to PDF
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: docs/Executive_Summary.tex
+          compiler: pdflatex
+
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Starry_PriceManagement_Technical_Whitepaper
+          path: docs/Executive_Summary.pdf

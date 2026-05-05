@@ -1,0 +1,153 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+
+% Enterprise Colors
+\definecolor{primary}{RGB}{0, 87, 194}
+\definecolor{secondary}{RGB}{65, 71, 85}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    filecolor=magenta,      
+    urlcolor=primary,
+    pdftitle={Technical Whitepaper - Starry VietNam},
+}
+
+\titleformat{\section}{\Large\bfseries\color{primary}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{secondary}}{}{0em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Technical Whitepaper}
+\lhead{Enterprise Price Management}
+\cfoot{\thepage}
+
+\begin{document}
+
+% -------------------------
+% COVER PAGE
+% -------------------------
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge \bfseries Technical Whitepaper \&\\[0.3cm] Enterprise Architecture Report}\\[1.5cm]
+    
+    {\LARGE \textbf{Price Management System}}\\[0.5cm]
+    {\large Developed for Starry VietNam Assessment}\\[2cm]
+    
+    \textbf{Candidate:} [Tên của anh]\\[0.5cm]
+    \textbf{Date:} \today\\[3cm]
+    
+    \begin{flushleft}
+        \Large \textbf{Quick Access Links:}\\[0.5cm]
+        \normalsize
+        \textbf{Live Application:} \url{https://price-management.clouds.io.vn}\\
+        \textbf{API Documentation (Scalar):} \url{https://price-management.clouds.io.vn/scalar}\\
+        \textbf{Swagger UI:} \url{https://price-management.clouds.io.vn/swagger}\\
+        \textbf{GitHub Repository:} \url{https://github.com/HThanh-how/price-management-starry}
+    \end{flushleft}
+    
+    \vfill
+    \textit{This document outlines the architectural decisions, structural patterns, and enterprise-grade features engineered for maximum scalability, performance, and reliability.}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% -------------------------
+% SECTION 1
+% -------------------------
+\section{Executive Summary}
+This project transcends the requirements of a standard CRUD application. The objective was to engineer a highly scalable, observable, and resilient system capable of handling heavy enterprise workloads. By combining a strictly decoupled \textbf{N-Layer Domain-Driven Design (DDD)} on the backend (.NET 10) with a \textbf{Feature-Sliced Design (FSD)} on the frontend (Next.js 16), the system guarantees long-term maintainability.
+
+% -------------------------
+% SECTION 2
+% -------------------------
+\section{System Previews \& Core Modules}
+
+The application manages three core domains: Items, Suppliers, and Price Histories.
+
+\subsection{Master Item List \& Master-Detail Flow}
+The Item registry utilizes dynamic AG Grid rendering with inline editing. Clicking any item opens a master-detail panel revealing all linked suppliers and historical pricing data instantaneously.
+\begin{center}
+    \includegraphics[width=0.9\textwidth]{assets/items_demo.png}
+\end{center}
+
+\subsection{Supplier \& Vendor Management}
+A dedicated module for managing vendor details, featuring robust client-side and server-side validations.
+\begin{center}
+    \includegraphics[width=0.9\textwidth]{assets/suppliers_demo.png}
+\end{center}
+
+\subsection{Price History Management}
+Records prices using advanced relational dropdowns linked to existing Items and Suppliers, supporting multi-currency metadata.
+\begin{center}
+    \includegraphics[width=0.9\textwidth]{assets/prices_demo.png}
+\end{center}
+
+\subsection{Modern API Documentation (Scalar)}
+Full OpenAPI schema generation featuring beautiful, interactive documentation via Scalar.
+\begin{center}
+    \includegraphics[width=0.9\textwidth]{assets/scalar_demo.png}
+\end{center}
+
+\newpage
+
+% -------------------------
+% SECTION 3
+% -------------------------
+\section{Enterprise-Grade Architecture Deep Dive}
+
+\subsection{1. SWR (Stale-While-Revalidate) \& Distributed Redis Caching}
+To achieve \textbf{Zero-Wait UI ($<10$ms response times)}, the system implements an aggressive dual-key caching strategy:
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Dual-Key Redis Strategy:} The backend stores the actual data payload (TTL: 1 Hour) alongside a "Fresh Marker" (TTL: 3 Seconds).
+    \item \textbf{Background Revalidation:} If a user requests data after the 3-second fresh window, the API instantly serves the "Stale" data from Redis to eliminate loading screens, while silently spinning up a \texttt{Task.Run} background thread to query MySQL and repopulate the cache.
+\end{itemize}
+
+\subsection{2. Data Integrity \& Concurrency Control}
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Optimistic Concurrency:} Every database table includes a \texttt{RowVersion} timestamp. If two analysts edit the same entity simultaneously, the system prevents "lost updates" and throws a \texttt{ConflictException}.
+    \item \textbf{Soft Deletion:} Records are never physically deleted. They are flagged with \texttt{IsDeleted} and \texttt{DeletedAt}, filtered globally by EF Core.
+\end{itemize}
+
+\subsection{3. Automated Audit Logging}
+Business logic should not be polluted with logging code. 
+\begin{itemize}[label=\textbullet]
+    \item \textbf{EF Core Interceptors:} An \texttt{AuditInterceptor} hooks into \texttt{SaveChanges()}, recording \textit{Who}, \textit{When}, and \textit{What} (a JSON diff of \texttt{OldValues} vs \texttt{NewValues}) directly into an \texttt{audit\_logs} table.
+\end{itemize}
+
+\subsection{4. Observability \& Performance Monitoring}
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Slow Query Detection:} A custom \texttt{SlowQueryInterceptor} monitors execution times, automatically flagging SQL queries taking longer than 200ms.
+    \item \textbf{Structured Logging (Serilog):} All system logs are formatted as JSON with a \texttt{TraceId} correlation token, tracking requests from the Nginx proxy down to the database layer.
+\end{itemize}
+
+\subsection{5. Security \& Dual-Layer Validation}
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Authentication:} Built-in Auth endpoints using robust \textbf{BCrypt} hashing.
+    \item \textbf{Validation:} \texttt{FluentValidation} ensures DTO strictness on the backend, while \texttt{Zod} and \texttt{React Hook Form} provide type-safe feedback on the frontend.
+    \item \textbf{RFC 7807 Problem Details:} A Global Exception Middleware standardizes all HTTP error payloads.
+\end{itemize}
+
+\section{CI/CD \& DevOps Excellence}
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Automated Pipeline:} GitHub Actions (\texttt{ci.yml}) executes backend unit tests (\texttt{xUnit}) and validates Docker multi-stage builds on every push.
+    \item \textbf{Full Containerization:} The entire stack (.NET 10, Next.js, MySQL, Redis, Nginx) is orchestrated via \texttt{docker-compose.yml}.
+    \item \textbf{Nginx Reverse Proxy:} Acts as an API Gateway, handling CORS, security headers, and routing.
+\end{itemize}
+
+\section{Conclusion}
+The architecture was engineered with the mindset of a Senior Architect preparing for extreme scale. Every component was chosen to ensure the system is not only functionally flawless but highly resilient, secure, and maintainable.
+
+\end{document}
