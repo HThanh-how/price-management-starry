@@ -108,7 +108,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     `is_active` tinyint(1) NOT NULL DEFAULT 1,
     `last_login_at` datetime(6) NULL,
     `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    `updated_at` datetime(6) NULL,
+    `created_by` varchar(100) NULL,
+    `updated_by` varchar(100) NULL,
     `deleted_at` datetime(6) NULL,
     `row_version` int unsigned NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`)
