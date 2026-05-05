@@ -18,7 +18,6 @@ export const appGridTheme = themeQuartz.withParams({
 
   /* Header */
   headerBackgroundColor: '#f4f3f3',
-  headerForegroundColor: '#414755',
   headerFontSize: 12,
   headerFontWeight: 500,
 
@@ -31,8 +30,4 @@ export const appGridTheme = themeQuartz.withParams({
   /* Typography */
   fontFamily: "'Inter', sans-serif",
   fontSize: 13,
-
-  /* Selection & Focus */
-  rangeSelectionBorderColor: '#0057c2',
-  inputFocusBorderColor: '#0057c2',
 });
