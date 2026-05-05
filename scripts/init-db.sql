@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
+CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
     `MigrationId` varchar(150) NOT NULL,
     `ProductVersion` varchar(32) NOT NULL,
     PRIMARY KEY (`MigrationId`)
@@ -11,6 +11,9 @@ CREATE TABLE `items` (
     `item_name` varchar(200) NOT NULL,
     `description` varchar(1000) NULL,
     `unit` varchar(20) NOT NULL,
+    `category` varchar(100) NULL,
+    `base_price` decimal(18,4) NULL,
+    `metadata` json NULL,
     `status` int NOT NULL,
     `created_at` datetime(6) NOT NULL,
     `updated_at` datetime(6) NULL,
@@ -80,6 +83,28 @@ CREATE UNIQUE INDEX `IX_suppliers_supplier_code` ON `suppliers` (`supplier_code`
 
 INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
 VALUES ('20260504080930_InitialCreate', '10.0.7');
+
+CREATE TABLE `audit_logs` (
+    `id` char(36) NOT NULL,
+    `entity_type` varchar(100) NOT NULL,
+    `entity_id` varchar(36) NOT NULL,
+    `action` varchar(20) NOT NULL,
+    `field_name` varchar(200) NULL,
+    `old_value` text NULL,
+    `new_value` text NULL,
+    `changed_by` varchar(100) NOT NULL DEFAULT 'system',
+    `changed_at` datetime(6) NOT NULL,
+    `ip_address` varchar(45) NULL,
+    `user_agent` varchar(500) NULL,
+    `trace_id` varchar(36) NULL,
+    `additional_data` json NULL,
+    PRIMARY KEY (`id`)
+);
+
+CREATE INDEX `IX_audit_entity_type_id` ON `audit_logs` (`entity_type`, `entity_id`);
+CREATE INDEX `IX_audit_action` ON `audit_logs` (`action`);
+CREATE INDEX `IX_audit_changed_at` ON `audit_logs` (`changed_at`);
+CREATE INDEX `IX_audit_trace_id` ON `audit_logs` (`trace_id`);
 
 COMMIT;
 
