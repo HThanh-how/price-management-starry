@@ -55,6 +55,10 @@ try
     // Register the slow query interceptor
     builder.Services.AddSingleton<PriceManagement.Api.Data.Interceptors.SlowQueryInterceptor>();
 
+    // Register IHttpContextAccessor + AuditInterceptor for enterprise audit trail
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<AuditInterceptor>();
+
     builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     {
         options.UseMySQL(connectionString);
@@ -67,7 +71,6 @@ try
             options.EnableDetailedErrors();
         }
     });
-
     // ========================================
     // Redis distributed caching
     // ========================================
@@ -92,6 +95,9 @@ try
     // Register Application layer services + validators
     // ========================================
     builder.Services.AddApplicationServices();
+
+    // AuditLogService lives in API layer (depends on AppDbContext)
+    builder.Services.AddScoped<PriceManagement.Application.Services.Interfaces.IAuditLogService, PriceManagement.Api.Services.AuditLogService>();
 
     // ========================================
     // CORS configuration for Next.js frontend

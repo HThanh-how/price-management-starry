@@ -6,10 +6,17 @@ namespace PriceManagement.Api.Data;
 /// <summary>
 /// Application database context with audit trail automation and soft delete global filters.
 /// Overrides SaveChangesAsync to automatically set audit fields (CreatedAt, UpdatedAt, CreatedBy, UpdatedBy).
+/// Integrates AuditInterceptor for enterprise-grade change tracking.
 /// </summary>
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly AuditInterceptor? _auditInterceptor;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, AuditInterceptor? auditInterceptor = null)
+        : base(options)
+    {
+        _auditInterceptor = auditInterceptor;
+    }
 
     // ========================================
     // DbSets
@@ -18,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<Item> Items => Set<Item>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ItemSupplierPrice> ItemSupplierPrices => Set<ItemSupplierPrice>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     /// <summary>
     /// Configures entity relationships, indexes, constraints, and global query filters.
@@ -39,9 +47,8 @@ public class AppDbContext : DbContext
     }
 
     /// <summary>
-    /// Overrides SaveChangesAsync to automatically populate audit fields on all tracked entities.
-    /// This ensures CreatedAt, UpdatedAt, CreatedBy, and UpdatedBy are consistently set
-    /// without requiring manual assignment in every service method.
+    /// Overrides SaveChangesAsync to automatically populate audit fields on all tracked entities,
+    /// then captures field-level changes via AuditInterceptor before persisting.
     /// </summary>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -71,6 +78,26 @@ public class AppDbContext : DbContext
             }
         }
 
-        return await base.SaveChangesAsync(cancellationToken);
+        // ========================================
+        // Audit Trail: Capture changes BEFORE saving
+        // ========================================
+        List<AuditLog>? auditLogs = null;
+        if (_auditInterceptor != null)
+        {
+            auditLogs = _auditInterceptor.CaptureChanges(ChangeTracker);
+        }
+
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        // ========================================
+        // Audit Trail: Persist audit logs AFTER successful save
+        // ========================================
+        if (auditLogs != null && auditLogs.Count > 0)
+        {
+            AuditLogs.AddRange(auditLogs);
+            await base.SaveChangesAsync(cancellationToken);
+        }
+
+        return result;
     }
 }
