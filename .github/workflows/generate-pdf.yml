@@ -39,3 +39,15 @@ jobs:
         with:
           name: Starry_PriceManagement_Technical_Whitepaper
           path: docs/Executive_Summary.pdf
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: Enterprise-Whitepaper
+          name: 🚀 Enterprise Technical Whitepaper (Latest)
+          body: "Tài liệu đặc tả kiến trúc hệ thống (Technical Whitepaper) được tự động biên dịch từ LaTeX. Tải file PDF đính kèm bên dưới để gửi."
+          files: docs/Executive_Summary.pdf
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
