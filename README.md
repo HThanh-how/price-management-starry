@@ -14,11 +14,14 @@ All services are orchestrated via Docker Compose and served behind an Nginx reve
 - 📜 **Swagger UI (API Docs):** [https://price-management.clouds.io.vn/swagger](https://price-management.clouds.io.vn/swagger)
 - 🚀 **Scalar (Modern API Docs):** [https://price-management.clouds.io.vn/scalar](https://price-management.clouds.io.vn/scalar)
 - 🩺 **System Health Check:** [https://price-management.clouds.io.vn/health](https://price-management.clouds.io.vn/health)
+- 💻 **GitHub Repository:** [https://github.com/HThanh-how/price-management-starry](https://github.com/HThanh-how/price-management-starry)
 
 > **Test Credentials:**
 > - **Email:** `analyst@starry.vn`
 > - **Password:** `starry2026`
 > *(Note: The Auth guard is currently disabled by default for ease of assessment review).*
+> 
+> ⏳ **Server Uptime Notice:** To optimize resources, the live demonstration server operates daily between **09:00 AM and 11:00 PM (GMT+7)**. Outside these hours, the server is automatically shut down.
 
 ### Visual Previews
 | Master Item List (Master-Detail Flow) | Supplier Management |
