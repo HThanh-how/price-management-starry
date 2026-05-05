@@ -3,6 +3,12 @@
 # Services: MySQL, Redis, Backend API, Frontend, Nginx
 # =============================================
 # Port mapping: Host 8080 → Nginx → Backend/Frontend
+# Network topology:
+#   - All services share the same user-defined bridge `price_mgmt_net`.
+#   - MySQL & Redis are NOT published to the host (internal-only).
+#   - Nginx is the only ingress (port 8080:80).
+#   - Backend & Frontend can resolve mysql / redis / backend by service name
+#     thanks to Docker's embedded DNS on the user-defined bridge.
 
 services:
   # ========================================
@@ -12,6 +18,14 @@ services:
     image: mysql:8.0
     container_name: price-mysql
     restart: unless-stopped
+    # Force utf8mb4 at the server, connection, and client layers so that the
+    # init script and every subsequent connection handles Vietnamese / multi-byte
+    # text correctly (avoids the latin1 → mojibake double-encoding pitfall).
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --skip-character-set-client-handshake
+      - --init-connect=SET NAMES utf8mb4
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-StrongP@ss2026!}
       MYSQL_DATABASE: price_management
@@ -19,6 +33,8 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - price_mgmt_net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-StrongP@ss2026!}"]
       interval: 10s
@@ -35,6 +51,8 @@ services:
     # ports: not exposed to host (Redis already running on host)
     volumes:
       - redis_data:/data
+    networks:
+      - price_mgmt_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -66,6 +84,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - price_mgmt_net
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 15s
@@ -89,6 +109,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - price_mgmt_net
 
   # ========================================
   # Nginx Reverse Proxy (Entry Point)
@@ -104,6 +126,16 @@ services:
     depends_on:
       - frontend
       - backend
+    networks:
+      - price_mgmt_net
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  price_mgmt_net:
+    name: price_mgmt_net
+    driver: bridge
 
 volumes:
   mysql_data:

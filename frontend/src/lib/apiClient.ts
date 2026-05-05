@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { generateCorrelationId } from './correlationId';
 
 /**
  * Axios instance pre-configured for the Price Management API.
@@ -13,10 +14,11 @@ const apiClient = axios.create({
   timeout: 30000, // 30 second timeout
 });
 
-// Request interceptor: attach correlation ID to every request
+// Request interceptor: attach correlation ID to every request.
+// Uses a cross-context UUID generator so the app works even when served from
+// a non-secure HTTP origin (where `crypto.randomUUID` is unavailable).
 apiClient.interceptors.request.use((config) => {
-  const correlationId = crypto.randomUUID();
-  config.headers['X-Correlation-Id'] = correlationId;
+  config.headers['X-Correlation-Id'] = generateCorrelationId();
   return config;
 });
 

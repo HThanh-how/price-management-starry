@@ -2,6 +2,13 @@
 -- Price Management System — Database Schema & Sample Data
 -- Enterprise-grade initialization script
 -- =============================================
+-- IMPORTANT: This file contains UTF-8 multi-byte characters (Vietnamese names).
+-- Without an explicit `SET NAMES utf8mb4`, the mysql client falls back to
+-- `character_set_client = latin1` and reinterprets every UTF-8 byte as a
+-- separate Latin-1 character, then re-encodes those into utf8mb4 — producing
+-- double-encoded "Mojibake" (e.g. "Cà phê" → "CÃ phÃª"). Setting the
+-- session charset before any DDL/DML guarantees byte-accurate inserts.
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `__EFMigrationsHistory` (
     `MigrationId` varchar(150) NOT NULL,

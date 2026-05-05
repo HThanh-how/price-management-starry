@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PriceManagement.Application.DTOs.Common;
 using PriceManagement.Application.DTOs.Items;
@@ -21,11 +22,21 @@ namespace PriceManagement.Application.Services.Implementations;
 ///   3. When marker exists → data is "fresh" → serve from cache immediately.
 ///   4. When marker expired → data is "stale" → serve cached data + trigger background DB refresh.
 ///   5. Refresh button → invalidates cache completely → forces fresh fetch.
+///
+/// Background refresh isolation:
+///   The stale-revalidation work runs on a detached <see cref="Task.Run(Action)"/> that
+///   outlives the originating HTTP request. The request-scoped DbContext (and therefore
+///   the request-scoped <see cref="IItemRepository"/>) is disposed as soon as the request
+///   completes, so the background work MUST resolve repositories from a freshly created
+///   DI scope via <see cref="IServiceScopeFactory"/>. Capturing the request-scoped
+///   repository directly causes <see cref="ObjectDisposedException"/> on the
+///   underlying DbContext.
 /// </summary>
 public class ItemService : IItemService
 {
     private readonly IItemRepository _itemRepository;
     private readonly IDistributedCache _cache;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<ItemService> _logger;
 
     /// <summary>Redis options: absolute TTL for cached data (1 hour).</summary>
@@ -43,10 +54,12 @@ public class ItemService : IItemService
     public ItemService(
         IItemRepository itemRepository,
         IDistributedCache cache,
+        IServiceScopeFactory scopeFactory,
         ILogger<ItemService> logger)
     {
         _itemRepository = itemRepository;
         _cache = cache;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -71,14 +84,15 @@ public class ItemService : IItemService
                 return cachedResult;
             }
 
-            // Data is stale — serve it now, refresh in background
+            // Data is stale — serve it now, refresh in background.
+            // Use a detached scope so the background DbContext is independent of the request scope.
             _logger.LogInformation("SWR: STALE cache hit for items list. Serving stale data + background refresh.");
-            _ = Task.Run(() => RefreshItemListCacheAsync(request, cacheKey, freshKey), CancellationToken.None);
+            _ = Task.Run(() => RefreshItemListCacheAsync(request, cacheKey, freshKey));
             return cachedResult;
         }
 
         _logger.LogInformation("SWR: Cache MISS for items list. Fetching from database.");
-        return await FetchAndCacheItemListAsync(request, cacheKey, freshKey, cancellationToken);
+        return await FetchAndCacheItemListAsync(_itemRepository, request, cacheKey, freshKey, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -93,17 +107,8 @@ public class ItemService : IItemService
             var freshMarker = await GetFromCacheAsync<string>(freshKey, cancellationToken);
             if (freshMarker != null) return cached;
 
-            // Stale — serve + background refresh
-            _ = Task.Run(async () =>
-            {
-                var item = await _itemRepository.GetByIdAsync(id, CancellationToken.None);
-                if (item != null)
-                {
-                    var dto = item.ToDto();
-                    await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
-                    await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
-                }
-            }, CancellationToken.None);
+            // Stale — serve + background refresh in a detached DI scope.
+            _ = Task.Run(() => RefreshItemByIdCacheAsync(id, cacheKey, freshKey));
             return cached;
         }
 
@@ -128,16 +133,7 @@ public class ItemService : IItemService
             var freshMarker = await GetFromCacheAsync<string>(freshKey, cancellationToken);
             if (freshMarker != null) return cached;
 
-            _ = Task.Run(async () =>
-            {
-                var item = await _itemRepository.GetWithSupplierPricesAsync(id, CancellationToken.None);
-                if (item != null)
-                {
-                    var dto = item.ToDetailDto();
-                    await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
-                    await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
-                }
-            }, CancellationToken.None);
+            _ = Task.Run(() => RefreshItemDetailCacheAsync(id, cacheKey, freshKey));
             return cached;
         }
 
@@ -230,10 +226,16 @@ public class ItemService : IItemService
     // ========================================
 
     /// <summary>
-    /// Fetches item list from DB and caches both data + fresh marker.
+    /// Fetches item list from DB (using the supplied repository) and writes both the data
+    /// payload and the fresh marker to Redis. The repository is passed explicitly so the
+    /// caller controls its lifetime scope (request scope vs. background scope).
     /// </summary>
     private async Task<PagedResult<ItemDto>> FetchAndCacheItemListAsync(
-        PagedRequest request, string cacheKey, string freshKey, CancellationToken ct)
+        IItemRepository itemRepository,
+        PagedRequest request,
+        string cacheKey,
+        string freshKey,
+        CancellationToken ct)
     {
         // Build filter expression from search keyword
         System.Linq.Expressions.Expression<Func<Item, bool>>? filter = null;
@@ -260,7 +262,7 @@ public class ItemService : IItemService
             _ => q => q.OrderByDescending(i => i.CreatedAt)
         };
 
-        var (items, totalCount) = await _itemRepository.GetPagedAsync(
+        var (items, totalCount) = await itemRepository.GetPagedAsync(
             filter, orderBy, request.PageNumber, request.PageSize, ct);
 
         var result = new PagedResult<ItemDto>
@@ -278,20 +280,69 @@ public class ItemService : IItemService
     }
 
     /// <summary>
-    /// Background refresh: fetches fresh data from DB and updates cache.
-    /// Called when stale data is served to a user.
+    /// Background refresh for the items list. Runs detached from the originating
+    /// HTTP request, so it MUST resolve <see cref="IItemRepository"/> from a fresh
+    /// DI scope to avoid using a disposed DbContext.
     /// </summary>
     private async Task RefreshItemListCacheAsync(PagedRequest request, string cacheKey, string freshKey)
     {
         try
         {
             _logger.LogInformation("SWR: Background refresh started for items list.");
-            await FetchAndCacheItemListAsync(request, cacheKey, freshKey, CancellationToken.None);
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+            await FetchAndCacheItemListAsync(repository, request, cacheKey, freshKey, CancellationToken.None);
             _logger.LogInformation("SWR: Background refresh completed for items list.");
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "SWR: Background refresh failed for items list. Stale data will continue to be served.");
+        }
+    }
+
+    /// <summary>
+    /// Background refresh for a single item by ID. Uses an isolated DI scope.
+    /// </summary>
+    private async Task RefreshItemByIdCacheAsync(Guid id, string cacheKey, string freshKey)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+            var item = await repository.GetByIdAsync(id, CancellationToken.None);
+            if (item != null)
+            {
+                var dto = item.ToDto();
+                await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
+                await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SWR: Background refresh failed for item {ItemId}. Stale data will continue to be served.", id);
+        }
+    }
+
+    /// <summary>
+    /// Background refresh for an item detail (with supplier prices). Uses an isolated DI scope.
+    /// </summary>
+    private async Task RefreshItemDetailCacheAsync(Guid id, string cacheKey, string freshKey)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+            var item = await repository.GetWithSupplierPricesAsync(id, CancellationToken.None);
+            if (item != null)
+            {
+                var dto = item.ToDetailDto();
+                await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
+                await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SWR: Background refresh failed for item detail {ItemId}. Stale data will continue to be served.", id);
         }
     }
 
