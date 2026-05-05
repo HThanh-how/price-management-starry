@@ -8,6 +8,7 @@ import { useItemDetailQuery, useUpdateItemMutation } from '@/features/items/hook
 import { MetadataEditor } from '@/features/items/components/MetadataEditor';
 import { AuditHistoryPanel } from '@/features/items/components/AuditHistoryPanel';
 import type { ItemSupplierPriceDetailDto } from '@/types';
+import { appGridTheme } from '@/lib/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -291,8 +292,7 @@ export default function ItemEditPage() {
                   animateRows
                   pagination
                   paginationPageSize={10}
-                  className="ag-theme-alpine"
-                  theme="legacy"
+                  theme={appGridTheme}
                 />
               </div>
             </div>

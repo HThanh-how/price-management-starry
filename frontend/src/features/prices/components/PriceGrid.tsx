@@ -9,6 +9,8 @@ import { currencyValues } from '@/types/schemas';
 import { usePriceGridData } from '../hooks/usePriceGridData';
 import { priceKeys } from '../hooks/usePriceDropdownQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { appGridTheme } from '@/lib/gridTheme';
+import { GRID_DEFAULT_PAGE_SIZE, GRID_PAGE_SIZE_OPTIONS } from '@/lib/constants';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -70,7 +72,7 @@ export function PriceGrid() {
       cellRenderer: (params: { data: PriceDto }) => (
         <div className="flex items-center justify-center h-full">
           <button
-            className="text-primary hover:text-surface-tint p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-error hover:bg-error-container p-1 rounded transition-colors"
             onClick={() => handleDelete(params.data.id)}
             title="Delete Price"
           >
@@ -108,10 +110,9 @@ export function PriceGrid() {
           defaultColDef={{ resizable: true, floatingFilter: true }}
           getRowId={(params) => params.data.id}
           onCellValueChanged={onCellValueChanged}
-          animateRows pagination paginationPageSize={20}
-          paginationPageSizeSelector={[10, 20, 50, 100]}
-          className="ag-theme-alpine"
-          theme="legacy"
+          animateRows pagination paginationPageSize={GRID_DEFAULT_PAGE_SIZE}
+          paginationPageSizeSelector={[...GRID_PAGE_SIZE_OPTIONS]}
+          theme={appGridTheme}
         />
       </div>
     </div>

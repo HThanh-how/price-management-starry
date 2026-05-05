@@ -13,8 +13,14 @@ using PriceManagement.Domain.Interfaces;
 namespace PriceManagement.Application.Services.Implementations;
 
 /// <summary>
-/// Implementation of IItemService with Redis distributed caching.
-/// Caches list and detail results, automatically invalidates on create/update/delete.
+/// Implementation of IItemService with SWR (Stale-While-Revalidate) caching via Redis.
+///
+/// SWR Strategy:
+///   1. Data is cached in Redis with absolute TTL of 1 hour.
+///   2. A separate "fresh" marker key expires after 3 seconds.
+///   3. When marker exists → data is "fresh" → serve from cache immediately.
+///   4. When marker expired → data is "stale" → serve cached data + trigger background DB refresh.
+///   5. Refresh button → invalidates cache completely → forces fresh fetch.
 /// </summary>
 public class ItemService : IItemService
 {
@@ -22,22 +28,16 @@ public class ItemService : IItemService
     private readonly IDistributedCache _cache;
     private readonly ILogger<ItemService> _logger;
 
-    // Cache key patterns for consistent key naming
-    private const string CacheKeyAllItems = "items:all:{0}:{1}:{2}"; // page:size:search
-    private const string CacheKeyItemById = "items:id:{0}";
-    private const string CacheKeyItemDetail = "items:detail:{0}";
-
-    // Cache duration — 5 minutes for listing, 10 minutes for single item
-    private static readonly DistributedCacheEntryOptions ListCacheOptions = new()
+    /// <summary>Redis options: absolute TTL for cached data (1 hour).</summary>
+    private static readonly DistributedCacheEntryOptions DataCacheOptions = new()
     {
-        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-        SlidingExpiration = TimeSpan.FromMinutes(2)
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(AppConstants.RedisCacheTtlSeconds)
     };
 
-    private static readonly DistributedCacheEntryOptions ItemCacheOptions = new()
+    /// <summary>Redis options: SWR stale marker (3 seconds fresh window).</summary>
+    private static readonly DistributedCacheEntryOptions FreshMarkerOptions = new()
     {
-        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
-        SlidingExpiration = TimeSpan.FromMinutes(3)
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(AppConstants.RedisStaleAfterSeconds)
     };
 
     public ItemService(
@@ -56,86 +56,98 @@ public class ItemService : IItemService
         _logger.LogInformation("Retrieving items - Page: {PageNumber}, Size: {PageSize}, Search: {Search}",
             request.PageNumber, request.PageSize, request.Search);
 
+        var cacheKey = string.Format(AppConstants.CacheKeyItemList, request.PageNumber, request.PageSize, request.Search ?? "");
+        var freshKey = cacheKey + AppConstants.StaleMarkerSuffix;
+
         // Try cache first
-        var cacheKey = string.Format(CacheKeyAllItems, request.PageNumber, request.PageSize, request.Search ?? "");
         var cachedResult = await GetFromCacheAsync<PagedResult<ItemDto>>(cacheKey, cancellationToken);
         if (cachedResult != null)
         {
-            _logger.LogInformation("Cache HIT for items list. Key: {CacheKey}", cacheKey);
+            // Check if data is still "fresh" (marker key exists)
+            var freshMarker = await GetFromCacheAsync<string>(freshKey, cancellationToken);
+            if (freshMarker != null)
+            {
+                _logger.LogInformation("SWR: FRESH cache hit for items list. Key: {CacheKey}", cacheKey);
+                return cachedResult;
+            }
+
+            // Data is stale — serve it now, refresh in background
+            _logger.LogInformation("SWR: STALE cache hit for items list. Serving stale data + background refresh.");
+            _ = Task.Run(() => RefreshItemListCacheAsync(request, cacheKey, freshKey), CancellationToken.None);
             return cachedResult;
         }
 
-        _logger.LogInformation("Cache MISS for items list. Querying database...");
-
-        // Build filter expression from search keyword
-        System.Linq.Expressions.Expression<Func<Item, bool>>? filter = null;
-        if (!string.IsNullOrWhiteSpace(request.Search))
-        {
-            var search = request.Search.ToLower();
-            filter = i => i.ItemCode.ToLower().Contains(search) ||
-                          i.ItemName.ToLower().Contains(search) ||
-                          (i.Description != null && i.Description.ToLower().Contains(search));
-        }
-
-        // Build ordering function
-        Func<IQueryable<Item>, IOrderedQueryable<Item>>? orderBy = request.SortBy?.ToLower() switch
-        {
-            "itemcode" => request.SortDirection == "desc"
-                ? q => q.OrderByDescending(i => i.ItemCode)
-                : q => q.OrderBy(i => i.ItemCode),
-            "itemname" => request.SortDirection == "desc"
-                ? q => q.OrderByDescending(i => i.ItemName)
-                : q => q.OrderBy(i => i.ItemName),
-            "createdat" => request.SortDirection == "desc"
-                ? q => q.OrderByDescending(i => i.CreatedAt)
-                : q => q.OrderBy(i => i.CreatedAt),
-            _ => q => q.OrderByDescending(i => i.CreatedAt)
-        };
-
-        var (items, totalCount) = await _itemRepository.GetPagedAsync(
-            filter, orderBy, request.PageNumber, request.PageSize, cancellationToken);
-
-        var result = new PagedResult<ItemDto>
-        {
-            Items = items.Select(i => i.ToDto()).ToList(),
-            PageNumber = request.PageNumber,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
-
-        // Write to cache
-        await SetCacheAsync(cacheKey, result, ListCacheOptions, cancellationToken);
-        return result;
+        _logger.LogInformation("SWR: Cache MISS for items list. Fetching from database.");
+        return await FetchAndCacheItemListAsync(request, cacheKey, freshKey, cancellationToken);
     }
 
     /// <inheritdoc/>
     public async Task<ItemDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var cacheKey = string.Format(CacheKeyItemById, id);
-        var cached = await GetFromCacheAsync<ItemDto>(cacheKey, cancellationToken);
-        if (cached != null) return cached;
+        var cacheKey = string.Format(AppConstants.CacheKeyItemById, id);
+        var freshKey = cacheKey + AppConstants.StaleMarkerSuffix;
 
-        var item = await _itemRepository.GetByIdAsync(id, cancellationToken)
+        var cached = await GetFromCacheAsync<ItemDto>(cacheKey, cancellationToken);
+        if (cached != null)
+        {
+            var freshMarker = await GetFromCacheAsync<string>(freshKey, cancellationToken);
+            if (freshMarker != null) return cached;
+
+            // Stale — serve + background refresh
+            _ = Task.Run(async () =>
+            {
+                var item = await _itemRepository.GetByIdAsync(id, CancellationToken.None);
+                if (item != null)
+                {
+                    var dto = item.ToDto();
+                    await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
+                    await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
+                }
+            }, CancellationToken.None);
+            return cached;
+        }
+
+        var entity = await _itemRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(Item), id);
 
-        var dto = item.ToDto();
-        await SetCacheAsync(cacheKey, dto, ItemCacheOptions, cancellationToken);
-        return dto;
+        var result = entity.ToDto();
+        await SetCacheAsync(cacheKey, result, DataCacheOptions, cancellationToken);
+        await SetCacheAsync(freshKey, "1", FreshMarkerOptions, cancellationToken);
+        return result;
     }
 
     /// <inheritdoc/>
     public async Task<ItemDetailDto> GetDetailAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var cacheKey = string.Format(CacheKeyItemDetail, id);
-        var cached = await GetFromCacheAsync<ItemDetailDto>(cacheKey, cancellationToken);
-        if (cached != null) return cached;
+        var cacheKey = string.Format(AppConstants.CacheKeyItemDetail, id);
+        var freshKey = cacheKey + AppConstants.StaleMarkerSuffix;
 
-        var item = await _itemRepository.GetWithSupplierPricesAsync(id, cancellationToken)
+        var cached = await GetFromCacheAsync<ItemDetailDto>(cacheKey, cancellationToken);
+        if (cached != null)
+        {
+            var freshMarker = await GetFromCacheAsync<string>(freshKey, cancellationToken);
+            if (freshMarker != null) return cached;
+
+            _ = Task.Run(async () =>
+            {
+                var item = await _itemRepository.GetWithSupplierPricesAsync(id, CancellationToken.None);
+                if (item != null)
+                {
+                    var dto = item.ToDetailDto();
+                    await SetCacheAsync(cacheKey, dto, DataCacheOptions, CancellationToken.None);
+                    await SetCacheAsync(freshKey, "1", FreshMarkerOptions, CancellationToken.None);
+                }
+            }, CancellationToken.None);
+            return cached;
+        }
+
+        var entity = await _itemRepository.GetWithSupplierPricesAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(Item), id);
 
-        var dto = item.ToDetailDto();
-        await SetCacheAsync(cacheKey, dto, ItemCacheOptions, cancellationToken);
-        return dto;
+        var result = entity.ToDetailDto();
+        await SetCacheAsync(cacheKey, result, DataCacheOptions, cancellationToken);
+        await SetCacheAsync(freshKey, "1", FreshMarkerOptions, cancellationToken);
+        return result;
     }
 
     /// <inheritdoc/>
@@ -154,7 +166,7 @@ public class ItemService : IItemService
         await _itemRepository.AddAsync(entity, cancellationToken);
         await _itemRepository.SaveChangesAsync(cancellationToken);
 
-        // Invalidate list cache (new item added)
+        // Invalidate list cache (new item added) — force fresh on next request
         await InvalidateItemListCacheAsync(cancellationToken);
 
         _logger.LogInformation("Item created successfully with ID: {ItemId}", entity.Id);
@@ -189,7 +201,7 @@ public class ItemService : IItemService
         _itemRepository.Update(entity);
         await _itemRepository.SaveChangesAsync(cancellationToken);
 
-        // Invalidate caches for this item and list
+        // Invalidate all caches for this item and list
         await InvalidateItemCacheAsync(id, cancellationToken);
 
         _logger.LogInformation("Item updated successfully: {ItemId}", id);
@@ -214,8 +226,74 @@ public class ItemService : IItemService
     }
 
     // ========================================
-    // Redis cache helper methods
+    // SWR cache helper methods
     // ========================================
+
+    /// <summary>
+    /// Fetches item list from DB and caches both data + fresh marker.
+    /// </summary>
+    private async Task<PagedResult<ItemDto>> FetchAndCacheItemListAsync(
+        PagedRequest request, string cacheKey, string freshKey, CancellationToken ct)
+    {
+        // Build filter expression from search keyword
+        System.Linq.Expressions.Expression<Func<Item, bool>>? filter = null;
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.ToLower();
+            filter = i => i.ItemCode.ToLower().Contains(search) ||
+                          i.ItemName.ToLower().Contains(search) ||
+                          (i.Description != null && i.Description.ToLower().Contains(search));
+        }
+
+        // Build ordering function
+        Func<IQueryable<Item>, IOrderedQueryable<Item>>? orderBy = request.SortBy?.ToLower() switch
+        {
+            "itemcode" => request.SortDirection == "desc"
+                ? q => q.OrderByDescending(i => i.ItemCode)
+                : q => q.OrderBy(i => i.ItemCode),
+            "itemname" => request.SortDirection == "desc"
+                ? q => q.OrderByDescending(i => i.ItemName)
+                : q => q.OrderBy(i => i.ItemName),
+            "createdat" => request.SortDirection == "desc"
+                ? q => q.OrderByDescending(i => i.CreatedAt)
+                : q => q.OrderBy(i => i.CreatedAt),
+            _ => q => q.OrderByDescending(i => i.CreatedAt)
+        };
+
+        var (items, totalCount) = await _itemRepository.GetPagedAsync(
+            filter, orderBy, request.PageNumber, request.PageSize, ct);
+
+        var result = new PagedResult<ItemDto>
+        {
+            Items = items.Select(i => i.ToDto()).ToList(),
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalCount = totalCount
+        };
+
+        // Cache data (1 hour) + fresh marker (3 seconds)
+        await SetCacheAsync(cacheKey, result, DataCacheOptions, ct);
+        await SetCacheAsync(freshKey, "1", FreshMarkerOptions, ct);
+        return result;
+    }
+
+    /// <summary>
+    /// Background refresh: fetches fresh data from DB and updates cache.
+    /// Called when stale data is served to a user.
+    /// </summary>
+    private async Task RefreshItemListCacheAsync(PagedRequest request, string cacheKey, string freshKey)
+    {
+        try
+        {
+            _logger.LogInformation("SWR: Background refresh started for items list.");
+            await FetchAndCacheItemListAsync(request, cacheKey, freshKey, CancellationToken.None);
+            _logger.LogInformation("SWR: Background refresh completed for items list.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SWR: Background refresh failed for items list. Stale data will continue to be served.");
+        }
+    }
 
     /// <summary>
     /// Attempts to retrieve a cached value. Returns null on cache miss or Redis failure.
@@ -253,16 +331,21 @@ public class ItemService : IItemService
     }
 
     /// <summary>
-    /// Invalidates all caches related to a specific item (by ID, detail, and list).
+    /// Invalidates all caches related to a specific item (ID, detail, and list).
+    /// Called after create/update/delete to ensure consistency.
     /// </summary>
     private async Task InvalidateItemCacheAsync(Guid id, CancellationToken ct)
     {
         try
         {
-            await _cache.RemoveAsync(string.Format(CacheKeyItemById, id), ct);
-            await _cache.RemoveAsync(string.Format(CacheKeyItemDetail, id), ct);
-            // Note: List cache uses pattern-based keys; we invalidate the most common page
-            await _cache.RemoveAsync(string.Format(CacheKeyAllItems, 1, 100, ""), ct);
+            // Remove data keys
+            await _cache.RemoveAsync(string.Format(AppConstants.CacheKeyItemById, id), ct);
+            await _cache.RemoveAsync(string.Format(AppConstants.CacheKeyItemDetail, id), ct);
+            // Remove fresh markers
+            await _cache.RemoveAsync(string.Format(AppConstants.CacheKeyItemById, id) + AppConstants.StaleMarkerSuffix, ct);
+            await _cache.RemoveAsync(string.Format(AppConstants.CacheKeyItemDetail, id) + AppConstants.StaleMarkerSuffix, ct);
+            // Invalidate list cache (most common page)
+            await InvalidateItemListCacheAsync(ct);
         }
         catch (Exception ex)
         {
@@ -271,13 +354,15 @@ public class ItemService : IItemService
     }
 
     /// <summary>
-    /// Invalidates the items list cache.
+    /// Invalidates the items list cache (data + fresh marker).
     /// </summary>
     private async Task InvalidateItemListCacheAsync(CancellationToken ct)
     {
         try
         {
-            await _cache.RemoveAsync(string.Format(CacheKeyAllItems, 1, 100, ""), ct);
+            var listKey = string.Format(AppConstants.CacheKeyItemList, 1, AppConstants.DefaultPageSize, "");
+            await _cache.RemoveAsync(listKey, ct);
+            await _cache.RemoveAsync(listKey + AppConstants.StaleMarkerSuffix, ct);
         }
         catch (Exception ex)
         {

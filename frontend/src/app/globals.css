@@ -1,10 +1,7 @@
 /* ============================================
    Price Management Tool — Figma Design System
-   Tailwind Directives + AG Grid Override + Custom Styles
+   Tailwind Directives + Custom Styles
    ============================================ */
-
-@import 'ag-grid-community/styles/ag-grid.css';
-@import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 @tailwind base;
 @tailwind components;
@@ -31,55 +28,6 @@ body {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
   line-height: 1;
-}
-
-/* ---- AG Grid Theme Override (match Figma surface tokens) ---- */
-.ag-theme-alpine,
-.ag-theme-balham,
-.ag-root-wrapper {
-  --ag-border-radius: 4px;
-  --ag-background-color: #ffffff;
-  --ag-header-background-color: #f4f3f3;
-  --ag-odd-row-background-color: transparent;
-  --ag-row-hover-color: #f4f3f3;
-  --ag-border-color: #e9e8e8;
-  --ag-header-foreground-color: #414755;
-  --ag-foreground-color: #1b1c1c;
-  --ag-font-family: 'Inter', sans-serif;
-  --ag-font-size: 13px;
-  --ag-row-border-color: #e9e8e8;
-  --ag-selected-row-background-color: rgba(0, 87, 194, 0.08);
-  --ag-range-selection-border-color: #0057c2;
-  --ag-input-focus-border-color: #0057c2;
-  border: 1px solid #e9e8e8;
-  border-radius: 4px;
-  overflow: hidden;
-  font-family: 'Inter', sans-serif;
-}
-
-/* AG Grid header: small caps label style (Figma: uppercase tracking) */
-.ag-header-cell-label {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #414755;
-}
-
-/* AG Grid cell: monospace for data readability */
-.ag-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-/* AG Grid pagination bar */
-.ag-paging-panel {
-  border-top: 1px solid #e9e8e8;
-  background-color: #ffffff;
-  color: #414755;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
 }
 
 /* ---- Ant Design subtle overrides ---- */

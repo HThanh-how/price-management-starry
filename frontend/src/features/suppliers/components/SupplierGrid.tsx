@@ -6,6 +6,8 @@ import { AgGridReact } from 'ag-grid-react';
 import { AllCommunityModule, ModuleRegistry, type ColDef, type CellValueChangedEvent } from 'ag-grid-community';
 import type { SupplierDto } from '@/types';
 import { useSupplierGridMutations } from '../hooks/useSupplierQueries';
+import { appGridTheme } from '@/lib/gridTheme';
+import { GRID_DEFAULT_PAGE_SIZE, GRID_PAGE_SIZE_OPTIONS } from '@/lib/constants';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -94,10 +96,9 @@ export function SupplierGrid({ suppliers, isLoading }: SupplierGridProps) {
         defaultColDef={{ resizable: true, floatingFilter: true }}
         getRowId={(params) => params.data.id}
         onCellValueChanged={onCellValueChanged}
-        animateRows pagination paginationPageSize={20}
-        paginationPageSizeSelector={[10, 20, 50, 100]}
-        className="ag-theme-alpine"
-        theme="legacy"
+        animateRows pagination paginationPageSize={GRID_DEFAULT_PAGE_SIZE}
+        paginationPageSizeSelector={[...GRID_PAGE_SIZE_OPTIONS]}
+        theme={appGridTheme}
       />
     </div>
   );

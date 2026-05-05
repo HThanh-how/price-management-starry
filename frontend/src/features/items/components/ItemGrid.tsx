@@ -2,6 +2,8 @@ import React from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { type ColDef, type CellValueChangedEvent } from 'ag-grid-community';
 import type { ItemDto } from '@/types';
+import { appGridTheme } from '@/lib/gridTheme';
+import { GRID_DEFAULT_PAGE_SIZE, GRID_PAGE_SIZE_OPTIONS } from '@/lib/constants';
 
 interface ItemGridProps {
   items: ItemDto[];
@@ -32,7 +34,7 @@ export function ItemGrid({ items, isLoading, onCellValueChanged, onViewDetail, o
     { field: 'unit', headerName: 'Unit', width: 100, editable: true, filter: 'agTextColumnFilter', sortable: true },
     {
       field: 'basePrice', headerName: 'Base Price', width: 130, sortable: true,
-      valueFormatter: (params) => params.value != null ? `$${Number(params.value).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—',
+      valueFormatter: (params) => params.value != null ? `${Number(params.value).toLocaleString('vi-VN')} ₫` : '—',
     },
     {
       field: 'status', headerName: 'Status', width: 120, editable: true,
@@ -75,11 +77,10 @@ export function ItemGrid({ items, isLoading, onCellValueChanged, onViewDetail, o
         onCellValueChanged={onCellValueChanged}
         animateRows
         pagination
-        paginationPageSize={20}
-        paginationPageSizeSelector={[10, 20, 50, 100]}
+        paginationPageSize={GRID_DEFAULT_PAGE_SIZE}
+        paginationPageSizeSelector={[...GRID_PAGE_SIZE_OPTIONS]}
         rowSelection="single"
-        className="ag-theme-alpine"
-        theme="legacy"
+        theme={appGridTheme}
       />
     </div>
   );
