@@ -179,6 +179,11 @@ public class ItemService : IItemService
         entity.ItemName = request.ItemName.Trim();
         entity.Description = request.Description?.Trim();
         entity.Unit = request.Unit.Trim().ToUpperInvariant();
+        entity.Category = request.Category?.Trim();
+        entity.BasePrice = request.BasePrice;
+        entity.Metadata = request.Metadata != null && request.Metadata.Count > 0
+            ? System.Text.Json.JsonSerializer.Serialize(request.Metadata)
+            : null;
         entity.Status = Enum.Parse<EntityStatus>(request.Status, true);
 
         _itemRepository.Update(entity);

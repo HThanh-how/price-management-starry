@@ -40,6 +40,18 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(e => e.Category)
+            .HasColumnName("category")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.BasePrice)
+            .HasColumnName("base_price")
+            .HasColumnType("decimal(18,4)");
+
+        builder.Property(e => e.Metadata)
+            .HasColumnName("metadata")
+            .HasColumnType("json");
+
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<int>()

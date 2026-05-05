@@ -28,6 +28,24 @@ public class Item : BaseEntity
     public string Unit { get; set; } = string.Empty;
 
     /// <summary>
+    /// Category classification (e.g., "Raw Materials", "Components", "Metals").
+    /// Used for grouping and filtering items.
+    /// </summary>
+    public string? Category { get; set; }
+
+    /// <summary>
+    /// Base/reference price for the item before supplier-specific pricing.
+    /// </summary>
+    public decimal? BasePrice { get; set; }
+
+    /// <summary>
+    /// Flexible JSON metadata for dynamic attributes (barcode, weight, dimensions, etc.).
+    /// Stored as JSON in MySQL. Users can add custom fields without schema changes.
+    /// Example: {"barcode": "8934567890123", "weight": "10kg", "length": "5m", "width": "2m", "height": "1m"}
+    /// </summary>
+    public string? Metadata { get; set; }
+
+    /// <summary>
     /// Current status of the item. Defaults to Active.
     /// </summary>
     public Enums.EntityStatus Status { get; set; } = Enums.EntityStatus.Active;

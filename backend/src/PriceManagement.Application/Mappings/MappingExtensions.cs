@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PriceManagement.Application.DTOs.Items;
 using PriceManagement.Application.DTOs.Prices;
 using PriceManagement.Application.DTOs.Suppliers;
@@ -27,6 +28,9 @@ public static class MappingExtensions
         ItemName = entity.ItemName,
         Description = entity.Description,
         Unit = entity.Unit,
+        Category = entity.Category,
+        BasePrice = entity.BasePrice,
+        Metadata = DeserializeMetadata(entity.Metadata),
         Status = entity.Status.ToString(),
         CreatedAt = entity.CreatedAt,
         UpdatedAt = entity.UpdatedAt,
@@ -43,6 +47,9 @@ public static class MappingExtensions
         ItemName = entity.ItemName,
         Description = entity.Description,
         Unit = entity.Unit,
+        Category = entity.Category,
+        BasePrice = entity.BasePrice,
+        Metadata = DeserializeMetadata(entity.Metadata),
         Status = entity.Status.ToString(),
         CreatedAt = entity.CreatedAt,
         UpdatedAt = entity.UpdatedAt,
@@ -73,8 +80,28 @@ public static class MappingExtensions
         ItemName = request.ItemName.Trim(),
         Description = request.Description?.Trim(),
         Unit = request.Unit.Trim().ToUpperInvariant(),
+        Category = request.Category?.Trim(),
+        BasePrice = request.BasePrice,
+        Metadata = SerializeMetadata(request.Metadata),
         Status = EntityStatus.Active
     };
+
+    // ========================================
+    // JSON Metadata helpers
+    // ========================================
+
+    private static Dictionary<string, string>? DeserializeMetadata(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<Dictionary<string, string>>(json); }
+        catch { return null; }
+    }
+
+    private static string? SerializeMetadata(Dictionary<string, string>? metadata)
+    {
+        if (metadata == null || metadata.Count == 0) return null;
+        return JsonSerializer.Serialize(metadata);
+    }
 
     // ========================================
     // Supplier mappings

@@ -13,6 +13,9 @@ public class ItemDto
     public string ItemName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Unit { get; set; } = string.Empty;
+    public string? Category { get; set; }
+    public decimal? BasePrice { get; set; }
+    public Dictionary<string, string>? Metadata { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

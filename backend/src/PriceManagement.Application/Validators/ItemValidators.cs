@@ -26,6 +26,22 @@ public class CreateItemValidator : AbstractValidator<CreateItemRequest>
         RuleFor(x => x.Unit)
             .NotEmpty().WithMessage("Unit is required.")
             .MaximumLength(20).WithMessage("Unit must not exceed 20 characters.");
+
+        RuleFor(x => x.Category)
+            .MaximumLength(100).WithMessage("Category must not exceed 100 characters.");
+
+        RuleFor(x => x.BasePrice)
+            .GreaterThanOrEqualTo(0).WithMessage("Base price must be zero or positive.")
+            .When(x => x.BasePrice.HasValue);
+
+        RuleForEach(x => x.Metadata)
+            .Must(kv => !string.IsNullOrWhiteSpace(kv.Key))
+            .WithMessage("Metadata key must not be empty.")
+            .Must(kv => kv.Key.Length <= 100)
+            .WithMessage("Metadata key must not exceed 100 characters.")
+            .Must(kv => kv.Value.Length <= 500)
+            .WithMessage("Metadata value must not exceed 500 characters.")
+            .When(x => x.Metadata != null && x.Metadata.Count > 0);
     }
 }
 
@@ -46,6 +62,22 @@ public class UpdateItemValidator : AbstractValidator<UpdateItemRequest>
         RuleFor(x => x.Unit)
             .NotEmpty().WithMessage("Unit is required.")
             .MaximumLength(20).WithMessage("Unit must not exceed 20 characters.");
+
+        RuleFor(x => x.Category)
+            .MaximumLength(100).WithMessage("Category must not exceed 100 characters.");
+
+        RuleFor(x => x.BasePrice)
+            .GreaterThanOrEqualTo(0).WithMessage("Base price must be zero or positive.")
+            .When(x => x.BasePrice.HasValue);
+
+        RuleForEach(x => x.Metadata)
+            .Must(kv => !string.IsNullOrWhiteSpace(kv.Key))
+            .WithMessage("Metadata key must not be empty.")
+            .Must(kv => kv.Key.Length <= 100)
+            .WithMessage("Metadata key must not exceed 100 characters.")
+            .Must(kv => kv.Value.Length <= 500)
+            .WithMessage("Metadata value must not exceed 500 characters.")
+            .When(x => x.Metadata != null && x.Metadata.Count > 0);
 
         RuleFor(x => x.Status)
             .NotEmpty().WithMessage("Status is required.")
