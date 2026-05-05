@@ -63,6 +63,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.UpdatedAt)
             .HasColumnName("updated_at");
 
+        builder.Property(u => u.CreatedBy)
+            .HasColumnName("created_by");
+
+        builder.Property(u => u.UpdatedBy)
+            .HasColumnName("updated_by");
+
         builder.Property(u => u.DeletedAt)
             .HasColumnName("deleted_at");
 
