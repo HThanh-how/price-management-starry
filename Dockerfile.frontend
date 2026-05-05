@@ -12,8 +12,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ .
 
-# Set API URL for build-time (Next.js bakes env vars at build)
-ENV NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+# Set API URL for build-time (relative path — proxied by Nginx to backend)
+ENV NEXT_PUBLIC_API_URL=/api/v1
 
 RUN npm run build
 
