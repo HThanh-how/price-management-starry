@@ -25,6 +25,7 @@
 \titleformat{\section}{\Large\bfseries\color{primary}}{}{0em}{}[\titlerule]
 \titleformat{\subsection}{\large\bfseries\color{secondary}}{}{0em}{}
 
+\setlength{\headheight}{15pt}
 \pagestyle{fancy}
 \fancyhf{}
 \rhead{Technical Whitepaper}
@@ -80,25 +81,25 @@ The application manages three core domains: Items, Suppliers, and Price Historie
 \subsection{Master Item List \& Master-Detail Flow}
 The Item registry utilizes dynamic AG Grid rendering with inline editing. Clicking any item opens a master-detail panel revealing all linked suppliers and historical pricing data instantaneously.
 \begin{center}
-    \includegraphics[width=0.9\textwidth]{assets/items_demo.png}
+    \includegraphics[width=0.9\textwidth]{docs/assets/items_demo.png}
 \end{center}
 
 \subsection{Supplier \& Vendor Management}
 A dedicated module for managing vendor details, featuring robust client-side and server-side validations.
 \begin{center}
-    \includegraphics[width=0.9\textwidth]{assets/suppliers_demo.png}
+    \includegraphics[width=0.9\textwidth]{docs/assets/suppliers_demo.png}
 \end{center}
 
 \subsection{Price History Management}
 Records prices using advanced relational dropdowns linked to existing Items and Suppliers, supporting multi-currency metadata.
 \begin{center}
-    \includegraphics[width=0.9\textwidth]{assets/prices_demo.png}
+    \includegraphics[width=0.9\textwidth]{docs/assets/prices_demo.png}
 \end{center}
 
 \subsection{Modern API Documentation (Scalar)}
 Full OpenAPI schema generation featuring beautiful, interactive documentation via Scalar.
 \begin{center}
-    \includegraphics[width=0.9\textwidth]{assets/scalar_demo.png}
+    \includegraphics[width=0.9\textwidth]{docs/assets/scalar_demo.png}
 \end{center}
 
 \newpage
