@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ItemSupplierPrice> ItemSupplierPrices => Set<ItemSupplierPrice>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<User> Users => Set<User>();
 
     /// <summary>
     /// Configures entity relationships, indexes, constraints, and global query filters.

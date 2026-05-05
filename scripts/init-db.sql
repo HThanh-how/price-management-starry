@@ -106,5 +106,36 @@ CREATE INDEX `IX_audit_action` ON `audit_logs` (`action`);
 CREATE INDEX `IX_audit_changed_at` ON `audit_logs` (`changed_at`);
 CREATE INDEX `IX_audit_trace_id` ON `audit_logs` (`trace_id`);
 
-COMMIT;
+-- =============================================
+-- Users table — authentication & authorization
+-- =============================================
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` varchar(36) NOT NULL,
+    `email` varchar(255) NOT NULL,
+    `password_hash` varchar(255) NOT NULL,
+    `full_name` varchar(200) NOT NULL,
+    `role` varchar(50) NOT NULL DEFAULT 'Analyst',
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `last_login_at` datetime(6) NULL,
+    `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    `deleted_at` datetime(6) NULL,
+    `row_version` int NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+);
 
+CREATE UNIQUE INDEX `idx_users_email` ON `users` (`email`);
+
+-- Seed default admin user: analyst@starry.vn / starry2026
+-- BCrypt hash generated with cost factor 11
+INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `is_active`)
+VALUES (
+    'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    'analyst@starry.vn',
+    '$2a$11$LxVGSvmKKytVMqYA9RwfOeQHjYFgq7OGFnGhVqKBqGJ8nM5XKq5Oe',
+    'Starry Analyst',
+    'Admin',
+    1
+) ON DUPLICATE KEY UPDATE `id` = `id`;
+
+COMMIT;

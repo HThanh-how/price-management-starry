@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { message } from 'antd';
+import apiClient from '@/lib/apiClient';
 
 /**
  * Login Page for Starry VietNam Price Management System.
- * Enterprise-grade authentication UI with Material Design tokens.
- * Validates credentials client-side before granting access.
+ * Authenticates against backend API using BCrypt-hashed credentials.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -27,27 +27,27 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Simple credential check (enterprise would use OAuth/JWT)
-    // For demo: any valid email + password "starry2026" works
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      // Call backend auth API — password verified against BCrypt hash in DB
+      const response = await apiClient.post('/auth/login', { email, password });
+      const { data: userData } = response.data;
 
-    if (password === 'starry2026') {
-      // Store auth state
-      if (typeof window !== 'undefined') {
-        const userData = JSON.stringify({ email, name: email.split('@')[0], loginAt: new Date().toISOString() });
-        if (rememberMe) {
-          localStorage.setItem('auth_user', userData);
-        } else {
-          sessionStorage.setItem('auth_user', userData);
-        }
+      // Store authenticated user data
+      const userJson = JSON.stringify(userData);
+      if (rememberMe) {
+        localStorage.setItem('auth_user', userJson);
+      } else {
+        sessionStorage.setItem('auth_user', userJson);
       }
-      message.success('Welcome to Starry VietNam!');
-      router.push('/items');
-    } else {
-      message.error('Invalid credentials. Please try again.');
-    }
 
-    setIsLoading(false);
+      message.success(`Welcome, ${userData.fullName}!`);
+      router.push('/items');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Login failed. Please try again.';
+      message.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

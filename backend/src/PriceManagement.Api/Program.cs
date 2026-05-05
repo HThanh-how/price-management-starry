@@ -206,6 +206,23 @@ try
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await dbContext.Database.MigrateAsync();
             Log.Information("Database migration completed successfully.");
+
+            // Seed default admin user if no users exist
+            if (!await dbContext.Users.AnyAsync())
+            {
+                var adminUser = new PriceManagement.Domain.Entities.User
+                {
+                    Id = Guid.NewGuid(),
+                    Email = "analyst@starry.vn",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("starry2026"),
+                    FullName = "Starry Analyst",
+                    Role = "Admin",
+                    IsActive = true
+                };
+                dbContext.Users.Add(adminUser);
+                await dbContext.SaveChangesAsync();
+                Log.Information("Default admin user seeded: analyst@starry.vn");
+            }
         }
         catch (Exception ex)
         {

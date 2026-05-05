@@ -15,8 +15,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-StrongP@ss2026!}
       MYSQL_DATABASE: price_management
-    ports:
-      - "3306:3306"
+    # ports: not exposed to host (MySQL already running on host)
     volumes:
       - mysql_data:/var/lib/mysql
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -33,8 +32,7 @@ services:
     image: redis:7-alpine
     container_name: price-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # ports: not exposed to host (Redis already running on host)
     volumes:
       - redis_data:/data
     healthcheck:
