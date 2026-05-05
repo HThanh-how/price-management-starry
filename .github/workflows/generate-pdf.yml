@@ -4,35 +4,31 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'docs/Executive_Summary.tex'
+      - 'docs/**'
       - '.github/workflows/generate-pdf.yml'
   workflow_dispatch:
 
 jobs:
   build_pdf:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install WebP Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y webp
-
-      - name: Convert WebP images to PNG for LaTeX compatibility
-        run: |
-          if [ -d "docs/assets" ]; then
-            for f in docs/assets/*.webp; do 
-              dwebp "$f" -o "${f%.*}.png" || echo "Failed to convert $f"
-            done
-          fi
-
       - name: Compile LaTeX to PDF
         uses: xu-cheng/latex-action@v3
         with:
-          root_file: docs/Executive_Summary.tex
+          root_file: Executive_Summary.tex
+          working_directory: docs
           compiler: pdflatex
+          extra_system_packages: "libwebp-tools"
+          pre: |
+            cd assets ;
+            for f in *.webp; do dwebp "$f" -o "${f%.*}.png" 2>/dev/null || true; done ;
+            cd ..
 
       - name: Upload PDF Artifact
         uses: actions/upload-artifact@v4
@@ -45,8 +41,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: Enterprise-Whitepaper
-          name: 🚀 Enterprise Technical Whitepaper (Latest)
-          body: "Tài liệu đặc tả kiến trúc hệ thống (Technical Whitepaper) được tự động biên dịch từ LaTeX. Tải file PDF đính kèm bên dưới để gửi."
+          name: "\U0001F680 Enterprise Technical Whitepaper (Latest)"
+          body: "Technical Whitepaper auto-compiled from LaTeX. Download the PDF below."
           files: docs/Executive_Summary.pdf
           make_latest: true
         env:
