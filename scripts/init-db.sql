@@ -16,7 +16,7 @@ CREATE TABLE `items` (
     `updated_at` datetime(6) NULL,
     `created_by` varchar(100) NULL,
     `updated_by` varchar(100) NULL,
-    `is_deleted` tinyint(1) NOT NULL DEFAULT FALSE,
+    `deleted_at` datetime(6) NULL,
     `row_version` int unsigned NOT NULL,
     PRIMARY KEY (`id`)
 );
@@ -34,7 +34,7 @@ CREATE TABLE `suppliers` (
     `updated_at` datetime(6) NULL,
     `created_by` varchar(100) NULL,
     `updated_by` varchar(100) NULL,
-    `is_deleted` tinyint(1) NOT NULL DEFAULT FALSE,
+    `deleted_at` datetime(6) NULL,
     `row_version` int unsigned NOT NULL,
     PRIMARY KEY (`id`)
 );
@@ -51,14 +51,14 @@ CREATE TABLE `item_supplier_prices` (
     `updated_at` datetime(6) NULL,
     `created_by` varchar(100) NULL,
     `updated_by` varchar(100) NULL,
-    `is_deleted` tinyint(1) NOT NULL DEFAULT FALSE,
+    `deleted_at` datetime(6) NULL,
     `row_version` int unsigned NOT NULL,
     PRIMARY KEY (`id`),
     CONSTRAINT `FK_item_supplier_prices_items_item_id` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE RESTRICT,
     CONSTRAINT `FK_item_supplier_prices_suppliers_supplier_id` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT
 );
 
-CREATE INDEX `IX_isp_is_deleted` ON `item_supplier_prices` (`is_deleted`);
+CREATE INDEX `IX_isp_deleted_at` ON `item_supplier_prices` (`deleted_at`);
 
 CREATE INDEX `IX_isp_item_id` ON `item_supplier_prices` (`item_id`);
 
@@ -66,20 +66,20 @@ CREATE INDEX `IX_isp_item_supplier_date` ON `item_supplier_prices` (`item_id`, `
 
 CREATE INDEX `IX_isp_supplier_id` ON `item_supplier_prices` (`supplier_id`);
 
-CREATE INDEX `IX_items_is_deleted` ON `items` (`is_deleted`);
+CREATE INDEX `IX_items_deleted_at` ON `items` (`deleted_at`);
 
-CREATE UNIQUE INDEX `IX_items_item_code` ON `items` (`item_code`);
+CREATE UNIQUE INDEX `IX_items_item_code` ON `items` (`item_code`, `deleted_at`);
 
 CREATE INDEX `IX_items_status` ON `items` (`status`);
 
-CREATE INDEX `IX_suppliers_is_deleted` ON `suppliers` (`is_deleted`);
+CREATE INDEX `IX_suppliers_deleted_at` ON `suppliers` (`deleted_at`);
 
 CREATE INDEX `IX_suppliers_status` ON `suppliers` (`status`);
 
-CREATE UNIQUE INDEX `IX_suppliers_supplier_code` ON `suppliers` (`supplier_code`);
+CREATE UNIQUE INDEX `IX_suppliers_supplier_code` ON `suppliers` (`supplier_code`, `deleted_at`);
 
 INSERT INTO `__EFMigrationsHistory` (`MigrationId`, `ProductVersion`)
-VALUES ('20260504070058_InitialCreate', '10.0.7');
+VALUES ('20260504080930_InitialCreate', '10.0.7');
 
 COMMIT;
 
