@@ -18,17 +18,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Convert WebP to PNG (Ubuntu Runner)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webp
+          cd docs/assets
+          for f in *.webp; do dwebp "$f" -o "${f%.*}.png"; done
+          ls -la *.png
+
       - name: Compile LaTeX to PDF
         uses: xu-cheng/latex-action@v3
         with:
           root_file: Executive_Summary.tex
           working_directory: docs
           compiler: pdflatex
-          extra_system_packages: "libwebp-tools"
-          pre: |
-            cd assets ;
-            for f in *.webp; do dwebp "$f" -o "${f%.*}.png" 2>/dev/null || true; done ;
-            cd ..
 
       - name: Upload PDF Artifact
         uses: actions/upload-artifact@v4
