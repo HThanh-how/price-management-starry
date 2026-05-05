@@ -4,4 +4,7 @@
     <Project Path="src/PriceManagement.Application/PriceManagement.Application.csproj" />
     <Project Path="src/PriceManagement.Domain/PriceManagement.Domain.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PriceManagement.UnitTests/PriceManagement.UnitTests.csproj" />
+  </Folder>
 </Solution>
